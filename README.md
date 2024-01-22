@@ -6,6 +6,12 @@
 
 TO DO:
 
+General:
+- include sample of reference Q & M for Orion stars
+- include sample of reference Q & M for synthetic light-curves
+- include script file for reading light-curves and calculating Q & M. 
+
+
 - gaia:
     - Add class for reading Orion Light-curves
     - Add Jupyter notebook for downloading Orion Light-Curves
@@ -15,6 +21,8 @@ TO DO:
     - Add .py for periodicity & timescales
 
 - Jupyter notebook:
-  - Waveform estimation section (Chloé to add info)
-  - Filtering Section (Clhoé to add info)
+  - Waveform estimation section 
+    - (Chloé to add info)
+  - Filtering Section 
+    - (Clhoé to add info)
   - Add examples of waveform for validation
