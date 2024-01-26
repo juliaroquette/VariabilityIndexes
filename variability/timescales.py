@@ -4,12 +4,12 @@ Module for computing variability timescales.
 
 import numpy as np
 import pandas as pd
-
+from lightcurve import LightCurve
 # from sklearn.gaussian_process         import GaussianProcessRegressor
 # from sklearn.gaussian_process.kernels import RBF
 
 
-class TimeScale(lightcurve.LightCurve):
+class TimeScale(LightCurve):
     def __init__(self):
         super().__init__()
         

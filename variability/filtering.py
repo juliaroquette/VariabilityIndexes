@@ -3,8 +3,9 @@ Colection of fitlers
 """
 
 import numpy as np
+from lightcurve import LightCurve
 
-class Filtering(lightcurve.LightCurve):
+class Filtering(LightCurve):
     def __init__(self):
         super().__init__()
     

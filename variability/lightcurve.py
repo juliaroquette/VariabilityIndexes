@@ -1,3 +1,6 @@
+"""
+Base class for reading light curves
+"""
 
 import numpy as np
 import pandas as pd
@@ -5,6 +8,7 @@ import scipy as sp
 from astropy.timeseries import LombScargle
 
 class LightCurve:
+    
     def __init__(self, time, mag, err, mask=None):
         self.time = np.asarray(time, dtype=float)
         self.mag = np.asarray(mag, dtype=float)
