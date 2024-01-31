@@ -37,7 +37,8 @@ class LightCurve:
         self.time = np.asarray(time, dtype=float)[mask]
         self.mag = np.asarray(mag, dtype=float)[mask]
         self.err = np.asarray(err, dtype=float)[mask]
-        
+    
+    @property    
     def N(self):
         """
         Returns the number of datapoints in the light curve.
@@ -47,6 +48,7 @@ class LightCurve:
         """
         return len(self.mag)
     
+    @property
     def time_span(self):
         """
         Returns the total time-span of the light-curve
@@ -56,6 +58,7 @@ class LightCurve:
         """
         return np.max(self.time) - np.min(self.time)
     
+    @property
     def std(self):
         """
         Returns the standard deviation of the magnitude values.
@@ -65,6 +68,7 @@ class LightCurve:
         """
         return np.std(self.mag)
 
+    @property
     def mean(self):
         """
         Returns the mean of the magnitude values.
@@ -74,7 +78,7 @@ class LightCurve:
         """
         return np.mean(self.mag)
 
-
+    @property
     def weighted_average(self):
         """
         Returns the weighted average of the magnitude values.
@@ -84,6 +88,7 @@ class LightCurve:
         """
         return np.average(self.mag, weights=1./(self.err**2))
 
+    @property
     def median(self):
         """
         Returns the median of the magnitude values.
