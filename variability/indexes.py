@@ -37,7 +37,7 @@ from variability.lightcurve import LightCurve, FoldedLightCurve
 import scipy.stats as ss
 
 class VariabilityIndex:
-    def __init__(self, lc, **kwargs):
+    def __init__(self, lc, **kargs):
         if not isinstance(lc, LightCurve):
             raise TypeError("lc must be an instance of LightCurve")
         self.lc = lc
@@ -52,15 +52,14 @@ class VariabilityIndex:
         else:
             M_is_flux = False
         
-        self.M_index = self.M_index(self, percenile=M_percenile, is_flux=M_is_flux)
+        self.M_index = self.M_index(self, percentile=M_percenile, is_flux=M_is_flux)
         
-        #IS THIS THE PLACE TO ADD THE FILTERING?
  
     class M_index:
-        def __init__(self, parent, percentile=10., percentile=False):
+        def __init__(self, parent, percentile=10., is_flux=False):
             #default
             self._percentile = percentile
-            self.is_flux = percentile
+            self.is_flux = is_flux
             self.parent = parent
 
         @property
