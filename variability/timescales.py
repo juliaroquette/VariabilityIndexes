@@ -1,17 +1,21 @@
 """
 Module for computing variability timescales.
+
+@juliaroquette: At the moment
 """
 
 import numpy as np
 import pandas as pd
-from lightcurve import LightCurve
+from variability.lightcurve import LightCurve
+from astropy.timeseries import LombScargle
 # from sklearn.gaussian_process         import GaussianProcessRegressor
 # from sklearn.gaussian_process.kernels import RBF
 
 
-class TimeScale(LightCurve):
-    def __init__(self):
-        super().__init__()
+class TimeScale:
+    def __init__(self, LightCurve):
+        # super().__init__(time, mag, err, mask=None)
+        self.lc = LightCurve
         
     def get_LSP_period(self,
                           spp=10, 
@@ -34,7 +38,7 @@ class TimeScale(LightCurve):
             frequency float: frequency of the highest peak
             power float: power of the highest peak
         """
-        ls = LombScargle(self.time, self.mag)        
+        ls = LombScargle(self.lc.time, self.lc.mag)        
         if bool(no_limit):
             frequency, power = ls.autopower()
         else: 
@@ -78,25 +82,3 @@ class TimeScale(LightCurve):
     #     return timescale
     
     
-    def fold(self, tau):
-        """
-        Folds the light curve in phase for a given period. 
-        Returns magnitudes sorted by phase.
-
-        Parameters:
-        - mag: array-like, magnitudes (or uncertainties) of the light curve
-        - tau: array-like, time values of the light curve
-        - period: float, period of the light curve
-
-        Returns:
-        - phase: array-like, phase values of the folded light curve
-        - mag_sorted: array-like, magnitudes of the folded light curve sorted by phase
-        
-        """
-        # Calculate the phase values
-        phase = np.mod(self.time, tau) / tau
-        
-        # Sort the phase and magnitude arrays based on phase values
-        sort = np.argsort(self.phase)
-        self.phase = phase[sort]
-        self.mag_sorted = self.mag[sort]
