@@ -1,9 +1,11 @@
 """
 Colection of fitlers
 """
+
+import warnings
 import numpy as np
 import scipy as sp
-import warnings
+import pandas as pd
 from variability.lightcurve import LightCurve, FoldedLightCurve
 
 
@@ -16,10 +18,20 @@ class Filtering:
         if not self.even:
             warnings.warn("Time series may not be evenly spaced.", UserWarning)
 
+    def filtered(self, methhod='', **kargs):
+        """
+        Apply a filter of choise to detrend light-cruve.
+        
+        TODO:
+        Polish the list of functions for filtering and include
+        their application in this method.
+        """
+        pass
+
     def is_evenly_spaced(self, tolerance=0.1):
         """
         tests if a function is close to evenly spaced.
-        The default tolerance checsk if less than 0.01% of t
+        The default tolerance check if less than 0.01% of t
         """
         dt = self.lc.time[1:] - self.lc.time[:-1]
         num_outliers = len(np.where(abs(dt - np.mean(dt)) > 3*np.std(dt))[0])
@@ -185,12 +197,26 @@ class Filtering:
             select = np.where((self.lc.time >= start_time) & (self.lc.time <= end_time))
             smoothed_values[i] = np.mean(self.lc.mag[select])
         return smoothed_values
-    
-    
+
+    def rolling_average(self, window=5):
+        """
+        Uses
+        """
+        if not self.even:
+            warnings.warn("Using window size in datapoints number for uneven data.", UserWarning)                
+        return pd.Series(self.lc.mag).rolling(window, min_periods=window, win_type='boxcar', center=True, closed='neither').mean().to_numpy()
 
 
-    # def get_waveform():
-    #     pass
+# class WaveForm:
+#     def __init__(self, folded_lc, type=''):
+#         # self.phase, self.mag_pahsed, self.err_pahsed
+#         if not isinstance(folded_lc, FoldedLightCurve):
+#             raise TypeError("lc must be an instance of LightCurve")
+#         else:
+#             self.folded_lc = folded_lc
+    
+      
+
         
     # def waveform(self, window_size=5, min_per=1.):
     #     """
@@ -228,15 +254,7 @@ class Filtering:
     #     else:
     #         self.mag_waveform = np.full(len(self.phase), np.nan)
 
-# class WaveForm:
-#     def __init__(self, folded_lc, type=''):
-#         # self.phase, self.mag_pahsed, self.err_pahsed
-#         if not isinstance(folded_lc, FoldedLightCurve):
-#             raise TypeError("lc must be an instance of LightCurve")
-#         else:
-#             self.folded_lc = folded_lc
-    
-        
+  
 #     def circular_rolling_average_waveform(self, window_size=5):
 #         """
 #         Calculates the rolling average while centering the data around the phase value.
