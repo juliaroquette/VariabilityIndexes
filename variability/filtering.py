@@ -18,7 +18,7 @@ class Filtering:
         if not self.even:
             warnings.warn("Time series may not be evenly spaced.", UserWarning)
 
-    def filtered(self, methhod='', **kargs):
+    def filter(self, methhod='', **kargs):
         """
         Apply a filter of choise to detrend light-cruve.
         
@@ -207,17 +207,15 @@ class Filtering:
         return pd.Series(self.lc.mag).rolling(window, min_periods=window, win_type='boxcar', center=True, closed='neither').mean().to_numpy()
 
 
-# class WaveForm:
-#     def __init__(self, folded_lc, type=''):
-#         # self.phase, self.mag_pahsed, self.err_pahsed
-#         if not isinstance(folded_lc, FoldedLightCurve):
-#             raise TypeError("lc must be an instance of LightCurve")
-#         else:
-#             self.folded_lc = folded_lc
+class WaveForm:
+    def __init__(self, folded_lc, type=''):
+        # self.phase, self.mag_pahsed, self.err_pahsed
+        if not isinstance(folded_lc, FoldedLightCurve):
+            raise TypeError("lc must be an instance of LightCurve")
+        else:
+            self.folded_lc = folded_lc
     
-      
-
-        
+              
     # def waveform(self, window_size=5, min_per=1.):
     #     """
     #     returns the rolling percentile of an ordered light-curve
