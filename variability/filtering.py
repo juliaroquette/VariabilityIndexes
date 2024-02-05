@@ -3,6 +3,7 @@ Colection of fitlers
 """
 import numpy as np
 import scipy as sp
+import warnings
 from variability.lightcurve import LightCurve, FoldedLightCurve
 
 
@@ -11,7 +12,22 @@ class Filtering:
         if not isinstance(lc, LightCurve):
             raise TypeError("lc must be an instance of LightCurve")
         self.lc = lc
+        self.even = is_evenly_spaced(self)
+        if not self.even:
+        warnings.warn("Time series may not be evenly spaced.", UserWarning)
 
+
+
+    def is_evenly_spaced(self, tolerance=0.1):
+        """
+        tests if a function is close to evenly spaced.
+        The default tolerance checsk if less than 0.01% of t
+        """
+        dt = self.lc.time[1:] - self.lc.time[:-1]
+        num_outliers = len(np.where(abs(dt - np.mean(dt)) > 3*np.std(dt))[0])
+        return bool(num_outliers < (tolerance/100.)*len(self.lc.time))
+
+    #masking
     def sigma_clip(self, sigma=5):
         """
         remove outliers from the light-curve using a sigma clipping
@@ -19,8 +35,42 @@ class Filtering:
         """
         return np.abs(self.lc.mag - self.lc.median) <= sigma * self.lc.std
 
+    @classmethod
+    def get_num_time(time, timescale=10.):
+        """
+        Assuming the data is in days, this 
+        function conts how many points you need 
+        to cover a given timescale
+        """
+        time = time - np.nanmin(time)
+        return len(time[time < timescale])
+    
+    #detrending
+    def Cody_long_trend(self, timescale=10.):
+        """
+        Code used in Cody et al. 2018,2020
+        window=715 is appropriate for K2 data and equivalent to 10days
+        Source:
+        """
+        window = get_num_time(self.lc.time, timescale)
+        return scipy.ndimage.median_filter(self.lc.mag, size=window, mode='nearest')
+    
+        
+    def savgol_longtrend(time, mag) :
+        """
+        To be changed to timescale rather than window size
+        """
+        ws =  int(0.25*len(mag))
+        return savgol_filter(mag, ws, 3)
+    
+
+
+   
+
+    
+    
     # def smooth(self, window_days=20.):
-    #     """
+    
     #     for given light-curve with a time and mag, 
     #     use a window wd in days to smooth the light-curve
     #     then remove the smoothed curve form the 
@@ -35,7 +85,6 @@ class Filtering:
         # self.detrended_mag = self.lc.mag - smoothed_values + np.nanmean(self.lc.mag)
     
 
-    def 
 
     # def get_waveform():
     #     pass
@@ -161,10 +210,4 @@ class Filtering:
 
 
 
-# def remove_longtrend(time, mag) :
-        
-#         ws =  int(0.25*len(mag))
 
-#         mag_filt = savgol_filter(mag, ws, 3)
-#         mag_filt = mag - mag_filt + np.median(mag)
-#         return mag_filt
