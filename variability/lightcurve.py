@@ -251,23 +251,105 @@ class SyntheticLightCurve:
             self.mag_ec[eclipse_mask] -= eclipse_depth
             n += period
     
+    def quasiperiodic_dipper(self, 
+                             amp_mean, 
+                             amp_std, 
+                             period, 
+                             dip_factor):
+        """
+        Calculate the quasi-periodic dipper magnitude.
+
+        Parameters:
+        - t: Time array
+        - amp_mean: Mean amplitude of the random semi-amplitude
+        - amp_std: Standard deviation of the random semi-amplitude
+        - period: Period of the sine wave
+        - dip_factor: Dip factor quantifying dip strength
+
+        Returns:
+        - mag_qpd: Quasi-periodic dipper magnitude
+        """
+        amp_rand = np.random.normal(amp_mean, amp_std, len(t))
+
+        term1 = amp_rand/2 * np.sin(2 * np.pi * t / period)
+        term2 = 0.5 * dip_factor * np.sin(2 * np.pi * t / period) * (1 - np.sin(2 * np.pi * t / period))
+
+        mag_qpd = term1 + term2 + np.random.normal(0, 0.05, len(self.time))
+
+        self.mag_qpd = self.noisy_mag + mag_qpd
     
-    def periodic_dipper(self):
-        pass
+    def aperiodic_dippers(self, num_dips=3,
+                          dip_depth_range=(0.3, 1), 
+                          dip_width_range=(0.5, 2.5),
+                          amp = 1):
+        """
+        Generate a synthetic light curve with aperiodic dips. 
+        Based on a random walk.
+        """
     
-    def quasiperiodic_dipper(self):
-        pass
-    
-    def aperiodic_dippers(self):
-        pass
+        rand_walk = np.cumsum(np.random.randn(len(self.time)))
+
+        for _ in range(num_dips):
+            dip_position = np.random.randint(0, len(self.time))
+            dip_depth    = np.random.uniform(*dip_depth_range)
+            dip_width    = np.random.uniform(*dip_width_range)
+
+            gaussian_peak = dip_depth * np.exp(-((self.time - dip_position) / (dip_width / 2))**2)
+            rand_walk    -= gaussian_peak
+
+        # Normalize rand_walk to have a peak-to-peak amplitude of 1
+        normalized_rand_walk = (rand_walk - np.min(rand_walk)) / (np.max(rand_walk) - np.min(rand_walk))
+
+        # Scale with self.amp and add self.med_mag
+        self.mag_apd = noisy_mag + normalized_rand_walk * amp
+        
     
     def periodic_bursting(self):
         pass
     
-    def quasiperiodic_bursting(self):
-        pass
+    def quasiperiodic_bursting(self, std=0.02, ptp_amp=1, period=8., burst_factor=2):
+        '''
+        Generates a quasi periodic burst light curve with amplitude changing over time.
+        Amplitude is higher on the upper part of the sine (bursts).
+
+        Args:
+            std: std of Gaussian for overall amplitude variation
+            amp, frequency : parameters of the sine
+            burst_factor: factor controlling burstiness (higher values result in stronger bursts)
+
+        Returns:
+            mag_qpb
+        '''
+
+        # Calculate cumulative amplitude with burstiness
+        random_steps = np.random.normal(0, std, len(self.time))
+        amp_t = np.cumsum(random_steps) + ptp_amp
+        self.mag_qpb = self.noisy_mag + amp_t + burst_factor * 0.5 * (1 + np.sin(2 * np.pi * (self.time - min(self.time) / period)))
+
     
-    def aperiodic_bursting(self):
+    def aperiodic_bursting(self, num_bursts=3, burst_depth_range=(0.3, 1.), burst_width_range=(.5, 2.5), ptp_amp = 1):
+        """
+        Generate a synthetic light curve with aperiodic bursts.
+        Based on a random walk.
+        """
+        rand_walk = np.cumsum(np.random.randn(len(self.time)))
+
+        for _ in range(num_bursts):
+            burst_position = np.random.randint(0, len(self.time))
+            burst_depth    = np.random.uniform(*burst_depth_range)
+            burst_width    = np.random.uniform(*burst_width_range)
+
+            gaussian_peak = burst_depth * np.exp(-((self.time - burst_position) / (burst_width / 2))**2)
+            rand_walk    -= gaussian_peak
+
+        # Normalize rand_walk to have a peak-to-peak amplitude of 1
+        normalized_rand_walk = (rand_walk - np.min(rand_walk)) / (np.max(rand_walk) - np.min(rand_walk))
+
+        # Scale with self.amp and add self.med_mag
+        self.mag_apb = self.noisy_mag + normalized_rand_walk * ptp_amp
+        
+    def multiperiodic():
         pass
+
     
     
