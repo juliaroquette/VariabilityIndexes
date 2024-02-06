@@ -206,17 +206,35 @@ class SyntheticLightCurve:
         else:
             raise ValueError('Either time or N must be provided')
         
-        self.noisy_mag = mean_magnitude + np.random.normal(scale=noise_level, size=n_epochs)
-        self.mag_err = abs(np.random.normal(loc=mean_error, scale=noise_level, size=n_epochs))
+        self.noisy_mag = mean_magnitude + np.random.normal(scale=noise_level, size=self.n_epochs)
+        self.err = abs(np.random.normal(loc=mean_error, scale=noise_level, size=self.n_epochs))
         
-    def periodic(self, ptp_amp = 1, period=2., phi=0.):
-        return self.noisy_mag + 0.5*ptp_amp * np.sin(2 * np.pi * self.time / period + phi)
+    def periodic(self, ptp_amp = 0.2, period=8., phi=0.):
+        self.mag_sin = self.noisy_mag + 0.5*ptp_amp * np.sin(2 * np.pi * self.time / period + phi)
     
     def quasiperiodic(self):
         pass
     
-    def eclipsing_binary(self):
-        pass
+    def eclipsing_binary(self, 
+           ptp_amp = 0.3, 
+           period=2., 
+           phi=0., #in terms of phase, 
+           eclipse_duration=0.3 #in terms of phase
+           ):
+        '''
+        Generates a lc with for a strictly periodic and eclipsing-like lightcurve
+        '''
+        self.mag_ec = self.noisy_mag
+        eclipse_start = phi   # Start time of the eclipse
+        eclipse_end = phi + eclipse_duration  # End time of the eclipse
+        eclipse_depth = ptp_amp  # Depth of the eclipse (0.0 to 1.0)
+        # n = (2.*np.pi)*np.random.random(1) # get a random phase
+        n = 0.
+        while n < max(self.time):
+            eclipse_mask = np.logical_and(self.time >= n + eclipse_start  , self.time <= n + eclipse_end)
+            self.mag_ec[eclipse_mask] -= eclipse_depth
+            n += period
+    
     
     def periodic_dipper(self):
         pass
