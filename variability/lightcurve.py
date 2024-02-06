@@ -211,7 +211,6 @@ class SyntheticLightCurve:
         
     def periodic(self, ptp_amp = 1, period=2., phi=0.):
         return self.noisy_mag + 0.5*ptp_amp * np.sin(2 * np.pi * self.time / period + phi)
-
     
     def quasiperiodic(self):
         pass
