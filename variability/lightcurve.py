@@ -210,10 +210,26 @@ class SyntheticLightCurve:
         self.err = abs(np.random.normal(loc=mean_error, scale=noise_level, size=self.n_epochs))
         
     def periodic(self, ptp_amp = 0.2, period=8., phi=0.):
-        self.mag_sin = self.noisy_mag + 0.5*ptp_amp * np.sin(2 * np.pi * self.time / period + phi)
+        self.mag_sin = self.noisy_mag + 0.5*ptp_amp * np.sin(2 * np.pi * (self.time - np.min(self.time)) / period + phi)
     
-    def quasiperiodic(self):
-        pass
+    def quasiperiodic(self, std=0.02, ptp_amp= 1., period=10., phi=0.):
+        '''
+        Generates a lc with amplitude changing over time. For each time step, the amplitude is drawn from a Gaussian distribution
+
+        Args :
+            time : light curve time array
+            std : std of Gaussian
+
+        returns :
+            mag
+            
+        TO DO: We need to add a few constraints to the degree of quasiperiodicity
+        (for example, it has to be smaller than a fraction of the amplitude)
+        '''
+        random_steps     = np.random.normal(0, std, len(self.time))            
+        amp_t            = np.cumsum(random_steps) + ptp_amp
+        self.mag_qp = self.noisy_mag +\
+            0.5 * amp_t * np.sin(2 * np.pi * (self.time - np.min(self.time)) / period + phi) 
     
     def eclipsing_binary(self, 
            ptp_amp = 0.3, 
