@@ -251,6 +251,20 @@ class SyntheticLightCurve:
             self.mag_ec[eclipse_mask] -= eclipse_depth
             n += period
     
+    def AATau(self,
+              ptp_amp=0.3,
+              period=8.,
+              dip_width=0.5, # in terms of phase fraction
+              ):
+        d_phi = dip_width / 2.
+        phase = (self.time - min(self.time))/period - np.floor((self.time-min(self.time))/period)
+        self.mag_aatau = self.noisy_mag
+        eclipse = abs(phase < d_phi)
+        self.mag_aatau[eclipse] -= ptp_amp*np.cos(0.5 * np.pi * phase[eclipse] / d_phi)
+        
+        
+        
+    
     def quasiperiodic_dipper(self, 
                              amp_mean, 
                              amp_std, 
