@@ -148,7 +148,7 @@ class WaveForm:
         else:
             self._lc = folded_lc
   
-    def circular_rolling_average_waveform(self, window_size=5):
+    def circular_rolling_average_number(self, window_size=5):
         """
         Calculates the rolling average while centering the data around the phase value.
         
@@ -171,13 +171,13 @@ class WaveForm:
                             int(np.round(0.5*window_size + 1)))])
         
         return extended_waveform[self._lc.N - int(0.5 * window_size):
-            2 * self.folded_lc.N - int(0.5 * window_size)]
+            2 * self._lc.N - int(0.5 * window_size)]
         
-    def savgol(self, window, polynom=3):
+    def savgol(self, window=10, polynom=3):
         return sp.signal.savgol_filter(self._lc.mag_phased, window, polynom)
     
 
-    def waveform_phase_fraction(self, wd_phase=0.1):
+    def circular_rolling_average_phase(self, wd_phase=0.1):
         """
         Calculate the waveform phase fraction.
 
@@ -189,7 +189,7 @@ class WaveForm:
         Returns:
         - waveform (array-like): Array with the waveform .
         """
-        waveform = np.full(len(phase), np.nan)
+        waveform = np.full(len(self._lc.phase), np.nan)
         extended_phase = np.concatenate((self._lc.phase - 1, self._lc.phase, 1 + self._lc.phase))
         extended_mag = np.concatenate((self._lc.mag_phased, self._lc.mag_phased, self._lc.mag_phased))
         for i, p in enumerate(self._lc.phase[3:]):
@@ -211,7 +211,12 @@ class WaveForm:
         return smooth_mag
 
     def waveform_Cody(self, n_point=50):
-        return sp.ndimage.filters.median_filter(self._lc.mag_phased, size=n_point, mode='wrap')        
+        return sp.ndimage.filters.median_filter(self._lc.mag_phased, size=n_point, mode='wrap')   
+    
+    def uneven_savgol(self, window, polynom):
+        x = self._lc.phase
+        y = self._lc.mag_phased
+        return uneven_savgol(x, y, window, polynom)     
 
 
 def uneven_savgol(x, y, window, polynom):
