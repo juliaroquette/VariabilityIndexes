@@ -179,8 +179,8 @@ class FoldedLightCurve(LightCurve):
         # Sort the phase and magnitude arrays based on phase values
         sort = np.argsort(phase)
         self.phase = phase[sort]
-        self.mag_pahsed = self.mag[sort]       
-        self.err_pahsed = self.err[sort]
+        self.mag_phased = self.mag[sort]       
+        self.err_phased = self.err[sort]
 
 class SyntheticLightCurve:
     """
@@ -201,16 +201,19 @@ class SyntheticLightCurve:
             mask = np.where(np.isfinite(kargs['time']))[0]
             self.time = np.asarray(kargs['time'], dtype=float)[mask]
             self.n_epochs = len(self.time)
+            self.time.setflags(write=False)  # Set the array as read-only
         elif 'n_epochs' in kargs.keys():
             self.time = np.linspace(0, 100, kargs['n_epochs'])
         else:
             raise ValueError('Either time or N must be provided')
         
-        self.noisy_mag = mean_magnitude + np.random.normal(scale=noise_level, size=self.n_epochs)
+        self._noisy_mag = mean_magnitude + np.random.normal(scale=noise_level, size=self.n_epochs)
+        self._noisy_mag.setflags(write=False)  # Set the array as read-only        
         self.err = abs(np.random.normal(loc=mean_error, scale=noise_level, size=self.n_epochs))
-        
+        self.err.setflags(write=False)  # Set the array as read-only        
+
     def periodic(self, ptp_amp = 0.2, period=8., phi=0.):
-        self.mag_sin = self.noisy_mag + 0.5*ptp_amp * np.sin(2 * np.pi * (self.time - np.min(self.time)) / period + phi)
+        self.mag_sin = self._noisy_mag + 0.5*ptp_amp * np.sin(2 * np.pi * (self.time - np.min(self.time)) / period + phi)
     
     def quasiperiodic(self, std=0.02, ptp_amp= 1., period=10., phi=0.):
         '''
@@ -228,7 +231,7 @@ class SyntheticLightCurve:
         '''
         random_steps     = np.random.normal(0, std, len(self.time))            
         amp_t            = np.cumsum(random_steps) + ptp_amp
-        self.mag_qp = self.noisy_mag +\
+        self.mag_qp = self._noisy_mag +\
             0.5 * amp_t * np.sin(2 * np.pi * (self.time - np.min(self.time)) / period + phi) 
     
     def eclipsing_binary(self, 
@@ -240,7 +243,7 @@ class SyntheticLightCurve:
         '''
         Generates a lc with for a strictly periodic and eclipsing-like lightcurve
         '''
-        self.mag_ec = self.noisy_mag
+        self.mag_ec = self._noisy_mag.copy()
         eclipse_start = phi   # Start time of the eclipse
         eclipse_end = phi + eclipse_duration  # End time of the eclipse
         eclipse_depth = ptp_amp  # Depth of the eclipse (0.0 to 1.0)
@@ -258,9 +261,9 @@ class SyntheticLightCurve:
               ):
         d_phi = dip_width / 2.
         phase = (self.time - min(self.time))/period - np.floor((self.time-min(self.time))/period)
-        self.mag_aatau = self.noisy_mag
+        self.mag_aatau = self._noisy_mag.copy()
         eclipse = abs(phase < d_phi)
-        self.mag_aatau[eclipse] -= ptp_amp*np.cos(0.5 * np.pi * phase[eclipse] / d_phi)
+        self.mag_aatau[eclipse] -= ptp_amp*abs(np.cos(0.5 * np.pi * phase[eclipse] / d_phi))
         
         
         
@@ -290,7 +293,7 @@ class SyntheticLightCurve:
 
         mag_qpd = term1 + term2 + np.random.normal(0, 0.05, len(self.time))
 
-        self.mag_qpd = self.noisy_mag + mag_qpd
+        self.mag_qpd = self._noisy_mag + mag_qpd
     
     def aperiodic_dippers(self, num_dips=3,
                           dip_depth_range=(0.3, 1), 
@@ -315,7 +318,7 @@ class SyntheticLightCurve:
         normalized_rand_walk = (rand_walk - np.min(rand_walk)) / (np.max(rand_walk) - np.min(rand_walk))
 
         # Scale with self.amp and add self.med_mag
-        self.mag_apd = noisy_mag + normalized_rand_walk * amp
+        self.mag_apd = self._noisy_mag + normalized_rand_walk * amp
         
     
     def periodic_bursting(self):
@@ -338,7 +341,7 @@ class SyntheticLightCurve:
         # Calculate cumulative amplitude with burstiness
         random_steps = np.random.normal(0, std, len(self.time))
         amp_t = np.cumsum(random_steps) + ptp_amp
-        self.mag_qpb = self.noisy_mag + amp_t + burst_factor * 0.5 * (1 + np.sin(2 * np.pi * (self.time - min(self.time) / period)))
+        self.mag_qpb = self._noisy_mag + amp_t + burst_factor * 0.5 * (1 + np.sin(2 * np.pi * (self.time - min(self.time) / period)))
 
     
     def aperiodic_bursting(self, num_bursts=3, burst_depth_range=(0.3, 1.), burst_width_range=(.5, 2.5), ptp_amp = 1):
@@ -360,7 +363,7 @@ class SyntheticLightCurve:
         normalized_rand_walk = (rand_walk - np.min(rand_walk)) / (np.max(rand_walk) - np.min(rand_walk))
 
         # Scale with self.amp and add self.med_mag
-        self.mag_apb = self.noisy_mag + normalized_rand_walk * ptp_amp
+        self.mag_apb = self._noisy_mag + normalized_rand_walk * ptp_amp
         
     def multiperiodic():
         pass
