@@ -12,6 +12,7 @@ Define a class/function that generates a sample of light-curves
 """
 
 import numpy as np
+np.random.seed(42)
 
 class LightCurve:
     """
@@ -207,15 +208,20 @@ class SyntheticLightCurve:
         else:
             raise ValueError('Either time or N must be provided')
         
+
+        
         self._noisy_mag = mean_magnitude + np.random.normal(scale=noise_level, size=self.n_epochs)
         self._noisy_mag.setflags(write=False)  # Set the array as read-only        
         self.err = abs(np.random.normal(loc=mean_error, scale=noise_level, size=self.n_epochs))
         self.err.setflags(write=False)  # Set the array as read-only        
 
-    def periodic(self, ptp_amp = 0.2, period=8., phi=0.):
+    def ps(self, ptp_amp = 0.2, period=8., phi=0.):
+        """
+        Periodic Symmetric light-curve
+        """
         self.mag_sin = self._noisy_mag + 0.5*ptp_amp * np.sin(2 * np.pi * (self.time - np.min(self.time)) / period + phi)
     
-    def quasiperiodic(self, std=0.02, ptp_amp= 1., period=10., phi=0.):
+    def qps(self, std=0.02, ptp_amp= 1., period=10., phi=0.):
         '''
         Generates a lc with amplitude changing over time. For each time step, the amplitude is drawn from a Gaussian distribution
 
@@ -229,44 +235,53 @@ class SyntheticLightCurve:
         TO DO: We need to add a few constraints to the degree of quasiperiodicity
         (for example, it has to be smaller than a fraction of the amplitude)
         '''
-        random_steps     = np.random.normal(0, std, len(self.time))            
-        amp_t            = np.cumsum(random_steps) + ptp_amp
+        amp_t = random_walk_1D(len(self.time), ptp_amp)
         self.mag_qp = self._noisy_mag +\
             0.5 * amp_t * np.sin(2 * np.pi * (self.time - np.min(self.time)) / period + phi) 
     
-    def eclipsing_binary(self, 
+    def eb(self, 
            ptp_amp = 0.3, 
+           secondary_fraction = 0.2, # primary_ptp/secondary_ptp
            period=2., 
-           phi=0., #in terms of phase, 
-           eclipse_duration=0.3 #in terms of phase
+           eclipse_duration=0.3, #in terms of phase
+           primary_eclipse_start = 0.    # Start time of the eclipse
            ):
         '''
         Generates a lc with for a strictly periodic and eclipsing-like lightcurve
         '''
+        assert secondary_fraction < 1, "Secondary fraction must be smaller than 1"
+        assert primary_eclipse_start + eclipse_duration < 0.5, "First eclipse must happen in the first half of the period"
         self.mag_ec = self._noisy_mag.copy()
-        eclipse_start = phi   # Start time of the eclipse
-        eclipse_end = phi + eclipse_duration  # End time of the eclipse
-        eclipse_depth = ptp_amp  # Depth of the eclipse (0.0 to 1.0)
-        # n = (2.*np.pi)*np.random.random(1) # get a random phase
-        n = 0.
-        while n < max(self.time):
-            eclipse_mask = np.logical_and(self.time >= n + eclipse_start  , self.time <= n + eclipse_end)
-            self.mag_ec[eclipse_mask] -= eclipse_depth
-            n += period
+        phase =  (self.time - min(self.time))/period - np.floor((self.time-min(self.time))/period)
+        secondary_eclipse_start = primary_eclipse_start + 0.5  # Start time of the eclipse
+        primary_eclipse_depth = ptp_amp  # Depth of the eclipse (0.0 to 1.0)
+        primary_eclipse = np.logical_and(phase >= primary_eclipse_start, phase <= primary_eclipse_start + eclipse_duration)
+        secondary_eclipse = np.logical_and(phase >= primary_eclipse_start + 0.5, phase <= primary_eclipse_start + 0.5 + eclipse_duration)
+        phi_ = (phase[primary_eclipse] - primary_eclipse_start) * np.pi / eclipse_duration
+        self.mag_ec[primary_eclipse] -= primary_eclipse_depth * \
+            np.sin(phi_)
+        phi_ = (phase[secondary_eclipse] - secondary_eclipse_start) * np.pi / eclipse_duration            
+        self.mag_ec[secondary_eclipse] -= secondary_fraction * primary_eclipse_depth * np.sin(phi_)
+
     
-    def AATau(self,
-              ptp_amp=0.3,
-              period=8.,
-              dip_width=0.5, # in terms of phase fraction
-              ):
-        d_phi = dip_width / 2.
-        phase = (self.time - min(self.time))/period - np.floor((self.time-min(self.time))/period)
-        self.mag_aatau = self._noisy_mag.copy()
-        eclipse = abs(phase < d_phi)
-        self.mag_aatau[eclipse] -= ptp_amp*abs(np.cos(0.5 * np.pi * phase[eclipse] / d_phi))
-        
-        
-        
+    def AATau(self, 
+           ptp_amp = 0.3, 
+           period=8., 
+           dip_width=0.9, #in terms of phase
+           dip_start = 0.05    # Start time of the eclipse
+           ):
+        '''
+        Generates a lc with for a AA Tau-like lightcurve
+        '''
+        assert dip_width < 1, "Dip-width must be smaller than 1"
+        # assert primary_eclipse_start + eclipse_duration < 0.5, "First eclipse must happen in the first half of the period"
+        self.mag_AATau = self._noisy_mag.copy()
+        phase =  (self.time - min(self.time))/period - np.floor((self.time - min(self.time))/period)
+        dip_in = np.logical_and(phase >= dip_start, phase <= dip_start + dip_width)
+        phi_ = (phase[dip_in] - dip_start) * np.pi / dip_width
+        ptp_A = self.random_walk_1D(len(self.time), ptp_amp)
+        self.mag_AATau[dip_in] -= abs(ptp_A[dip_in]) * np.sin(phi_)
+    
     
     def quasiperiodic_dipper(self, 
                              amp_mean, 
@@ -368,5 +383,28 @@ class SyntheticLightCurve:
     def multiperiodic():
         pass
 
-    
-    
+    @staticmethod
+    def random_walk_1D(n_steps, 
+                       ptp=1. 
+                       ):
+        """
+        Perform a 1-dimensional random walk.
+
+        Parameters:
+        - n_steps (int): The number of steps in the random walk 
+                        (or the number of observations in the light-curve).
+        - ptp (float): The desired peak-to-peak amplitude for the light-curve.
+                       This is used to rescale the generated random walk ptp. 
+
+        Returns:
+        - positions (ndarray): The positions after each step of the random walk,
+                               scaled to the desired peak-to-peak amplitude.
+
+        References:
+        - Random Walk: https://en.wikipedia.org/wiki/Random_walk
+        """
+        # Initialize array to store positions
+        steps = np.random.choice([-1, 1], n_steps)
+        positions = np.cumsum(steps)
+        ptp_0 = positions.max() - positions.min()
+        return positions * (ptp / ptp_0)
