@@ -12,6 +12,7 @@ Define a class/function that generates a sample of light-curves
 """
 
 import numpy as np
+import scipy.stats as ss
 np.random.seed(42)
 
 class LightCurve:
@@ -243,7 +244,7 @@ class SyntheticLightCurve:
            ptp_amp = 0.3, 
            secondary_fraction = 0.2, # primary_ptp/secondary_ptp
            period=2., 
-           eclipse_duration=0.3, #in terms of phase
+           eclipse_duration=0.15, #in terms of phase
            primary_eclipse_start = 0.    # Start time of the eclipse
            ):
         '''
@@ -284,7 +285,7 @@ class SyntheticLightCurve:
     
     
     def quasiperiodic_dipper(self, 
-                             amp_mean, 
+                             ptp_amp, 
                              amp_std, 
                              period, 
                              dip_factor):
@@ -301,6 +302,8 @@ class SyntheticLightCurve:
         Returns:
         - mag_qpd: Quasi-periodic dipper magnitude
         """
+        ptp_A = self.random_walk_1D(len(self.time), ptp_amp)
+
         amp_rand = np.random.normal(amp_mean, amp_std, len(t))
 
         term1 = amp_rand/2 * np.sin(2 * np.pi * t / period)
@@ -385,7 +388,10 @@ class SyntheticLightCurve:
 
     @staticmethod
     def random_walk_1D(n_steps, 
-                       ptp=1. 
+                       ptp=1. # final peak-to-peak amplitude of the random walk
+                       type_of_step='normal', # normal, unit, skewed-normal
+                       skewness=5. # if using skewed-normal, this is the skewness parameter, 
+                                   # it can be any real number (positive for dipper)
                        ):
         """
         Perform a 1-dimensional random walk.
@@ -403,8 +409,14 @@ class SyntheticLightCurve:
         References:
         - Random Walk: https://en.wikipedia.org/wiki/Random_walk
         """
-        # Initialize array to store positions
-        steps = np.random.choice([-1, 1], n_steps)
+        if type_of_step == 'normal':
+            steps = np.random.normal(loc=0, scale=1/3, size=n_steps)
+        elif type_of_step == 'unit':
+            steps = np.random.choice([-1, 1], size=n_steps)
+        elif type_of_step == 'skewed-normal':
+            steps = ss.skewnorm.rvs(loc=0, scale=1/3, a=skewness, size=n_steps)
+        else:
+            raise ValueError('Invalid type of step, possible values are: normal, unit, skewed-normal')
         positions = np.cumsum(steps)
         ptp_0 = positions.max() - positions.min()
         return positions * (ptp / ptp_0)
