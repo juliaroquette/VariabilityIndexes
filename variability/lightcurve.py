@@ -13,6 +13,7 @@ Define a class/function that generates a sample of light-curves
 
 import numpy as np
 import scipy.stats as ss
+import warnings
 np.random.seed(42)
 
 class LightCurve:
@@ -36,7 +37,11 @@ class LightCurve:
         - median (float): Median of the magnitude values.
     """
 
-    def __init__(self, time, mag, err, mask=None):
+    def __init__(self,
+                 time,
+                 mag,
+                 err,
+                 mask=None):
         """
         Initializes a LightCurve object.
 
@@ -173,7 +178,12 @@ class FoldedLightCurve(LightCurve):
         err_pahsed (array-like): The error values of the folded light curve, sorted based on phase.
     """
 
-    def __init__(self, time, mag, err, timescale, mask=None):
+    def __init__(self,
+                 time,
+                 mag,
+                 err,
+                 timescale,
+                 mask=None):
         super().__init__(time, mag, err, mask=mask)
         self.timescale = timescale 
         # Calculate the phase values
@@ -190,80 +200,145 @@ class SyntheticLightCurve:
     
     Has the same structure as a LightCurve object. 
     
-    TODO:
-    - Create a series of functions to generate different types of observational windows
     """
     def __init__(self, 
-                 mean_magnitude = 15.0, 
-                 noise_level=0., # Standard deviation of Gaussian noise
-                 mean_error=0.01, # Mean error of the light curve
                  **kargs):
-        #time=time, N=N, ptp=0.1, seed=None, mean=0.0, e_std=1.0, ):
+
+        # check if an observational window was passed as input        
         if 'time' in kargs.keys():
             mask = np.where(np.isfinite(kargs['time']))[0]
             self.time = np.asarray(kargs['time'], dtype=float)[mask]
-            self.n_epochs = len(self.time)
-            self.time.setflags(write=False)  # Set the array as read-only
-        elif 'n_epochs' in kargs.keys():
-            self.time = np.linspace(0, 100, kargs['n_epochs'])
         else:
-            raise ValueError('Either time or N must be provided')
-        
+            assert 'survey_window' in kargs.keys(), "Either a time array or survey_window keyword must be provided"
+            if kargs['survey_window'] == 'K2':
+                """ 
+                Based on a typical light-curve from K2 as in Cody+ 2018AJ....156...71C
+                """
+                # 1 observation every 30 minutes
+                cadence = 30./60./24. 
+                # 78 days of observations
+                timespan = 78
+                # typical noise level is 1.8mmag at 16th Kp magnitude
+                mean_mag = 16.0
+                noise_level = 0.0018
+                rms_noise = 0.0018
+                self.time = np.arange(0, timespan, cadence)
 
+            elif kargs['survey_window'] == 'CoRoT':
+                """ 
+                Based on a typical light-curve from CoRoT as in Cody+ 2014AJ....147...82
+                """
+                # 1 observation every 512 s
+                cadence = 512./60./60/24. 
+                # just over 37 days of observations
+                timespan = 37.4
+                # typical rms is 0.01-0.1 at 17th Kp magnitude
+                mean_mag = 16.0
+                noise_level = 0.01
+                rms_noise = 0.01
+                self.time = np.arange(0, timespan, cadence)
+            elif kargs['survey_window'] == 'TESS':
+                raise NotImplementedError
+            elif kargs['survey_window'] == 'Rubin':
+                raise NotImplementedError
+            elif kargs['survey_window'] == 'ZTF':
+                raise NotImplementedError
+            elif kargs['survey_window'] == 'ASAS-SN':
+                raise NotImplementedError
+            elif kargs['survey_window'] == 'GaiaDR3':
+                raise NotImplementedError
+            elif kargs['survey_window'] == 'GaiaDR4':
+                raise NotImplementedError
+            elif kargs['survey_window'] == 'AllWISE':
+                raise NotImplementedError                
+            else:
+                raise ValueError('Invalid survey window, possible values are: K2, TESS, Rubin, ZTF, ASAS-SN, GaiaDR3, GaiaDR4, AllWISE, CoRoT')
         
-        self._noisy_mag = mean_magnitude + np.random.normal(scale=noise_level, size=self.n_epochs)
+        self.n_epochs = len(self.time)
+        self.time.setflags(write=False)  # Set the array as read-only        
+        self._noisy_mag = mean_mag + np.random.normal(scale=noise_level, size=self.n_epochs)
+        self.err = abs(np.random.normal(loc=rms_noise, scale=noise_level, size=self.n_epochs))
         self._noisy_mag.setflags(write=False)  # Set the array as read-only        
-        self.err = abs(np.random.normal(loc=mean_error, scale=noise_level, size=self.n_epochs))
-        self.err.setflags(write=False)  # Set the array as read-only        
+        self.err.setflags(write=False)  # Set the array as read-only
+        #
+        # Defines some parameters for the light-curves
+        #
+        if 'ptp_amp' in kargs.keys():
+            self.ptp_amp = kargs['ptp_amp']
+        else:
+            self.ptp_amp = 0.1
+            warnings.warn(f'Peak-to-peak amplitude not provided, using default value of {self.ptp_amp}')
+        if 'period' in kargs.keys():
+            self.period = kargs['period']
+        else:
+            self.period = 8.
+            warnings.warn(f'Period not provided, using default value of {self.period}')
 
-    def ps(self, ptp_amp = 0.2, period=8., phi=0.):
+    def periodic_symmetric(self, 
+                           ptp_amp=None,
+                           period=None, 
+                           phi_0=0.):
         """
         Periodic Symmetric light-curve
         """
-        self.mag_sin = self._noisy_mag + 0.5*ptp_amp * np.sin(2 * np.pi * (self.time - np.min(self.time)) / period + phi)
+        if ptp_amp is None:
+            ptp_amp = self.ptp_amp
+            warnings.warn(f'periodic_symmetric: \n Using class default value of {self.ptp_amp}')
+        if period is None:
+            period = self.period
+            warnings.warn(f'periodic_symmetric: \n Using class default value of {self.ptp_amp}')            
+        self.mag_ps = self._noisy_mag + 0.5 * ptp_amp * \
+            np.sin(2. * np.pi * (self.time - np.min(self.time))\
+                / period + phi_0)
     
-    def qps(self, std=0.02, ptp_amp= 1., period=10., phi=0.):
+    def quasiperiodic_symmetric(self, std=0.02, ptp_amp= 1., period=10., phi=0.):
         '''
-        Generates a lc with amplitude changing over time. For each time step, the amplitude is drawn from a Gaussian distribution
-
-        Args :
-            time : light curve time array
-            std : std of Gaussian
-
-        returns :
-            mag
+      quasiperiodic symmetric
             
         TO DO: We need to add a few constraints to the degree of quasiperiodicity
         (for example, it has to be smaller than a fraction of the amplitude)
         '''
-        amp_t = random_walk_1D(len(self.time), ptp_amp)
-        self.mag_qp = self._noisy_mag +\
+        
+        amp_t = self.random_walk_1D(len(self.time), ptp_amp, type_of_step='normal')
+        self.mag_qps = self._noisy_mag +\
             0.5 * amp_t * np.sin(2 * np.pi * (self.time - np.min(self.time)) / period + phi) 
     
-    def eb(self, 
-           ptp_amp = 0.3, 
+    def eclipsing_binary(self, 
+           ptp_amp = None, 
            secondary_fraction = 0.2, # primary_ptp/secondary_ptp
-           period=2., 
+           period=None, 
            eclipse_duration=0.15, #in terms of phase
            primary_eclipse_start = 0.    # Start time of the eclipse
            ):
         '''
         Generates a lc with for a strictly periodic and eclipsing-like lightcurve
         '''
+        if ptp_amp is None:
+            ptp_amp = self.ptp_amp
+            warnings.warn(f'periodic_symmetric: \n Using class default value of {self.ptp_amp}')
+        if period is None:
+            period = self.period
+            warnings.warn(f'periodic_symmetric: \n Using class default value of {self.ptp_amp}')    
         assert secondary_fraction < 1, "Secondary fraction must be smaller than 1"
         assert primary_eclipse_start + eclipse_duration < 0.5, "First eclipse must happen in the first half of the period"
-        self.mag_ec = self._noisy_mag.copy()
+        # create a base noisy light-curve
+        self.mag_eb = self._noisy_mag.copy()
+        # calculate the phase for given period
         phase =  (self.time - min(self.time))/period - np.floor((self.time-min(self.time))/period)
+        # define eclipse parameters
         secondary_eclipse_start = primary_eclipse_start + 0.5  # Start time of the eclipse
         primary_eclipse_depth = ptp_amp  # Depth of the eclipse (0.0 to 1.0)
+        # select parts of the phased light-curve to be eclipsed
         primary_eclipse = np.logical_and(phase >= primary_eclipse_start, phase <= primary_eclipse_start + eclipse_duration)
         secondary_eclipse = np.logical_and(phase >= primary_eclipse_start + 0.5, phase <= primary_eclipse_start + 0.5 + eclipse_duration)
-        phi_ = (phase[primary_eclipse] - primary_eclipse_start) * np.pi / eclipse_duration
-        self.mag_ec[primary_eclipse] -= primary_eclipse_depth * \
+        # Convert phase fraction to be eclipsed into appropriate radian values for the model
+        phi_ = (phase[primary_eclipse] - primary_eclipse_start) * np.pi / eclipse_duration 
+        # eclipse relevant parts of the light-curve
+        self.mag_eb[primary_eclipse] -= primary_eclipse_depth * \
             np.sin(phi_)
+        # repeat for secondary eclipse
         phi_ = (phase[secondary_eclipse] - secondary_eclipse_start) * np.pi / eclipse_duration            
-        self.mag_ec[secondary_eclipse] -= secondary_fraction * primary_eclipse_depth * np.sin(phi_)
-
+        self.mag_eb[secondary_eclipse] -= secondary_fraction * primary_eclipse_depth * np.sin(phi_)
     
     def AATau(self, 
            ptp_amp = 0.3, 
@@ -385,10 +460,18 @@ class SyntheticLightCurve:
         
     def multiperiodic():
         pass
-
+    
+    @staticmethod
+    def new_observational_window():
+        pass
+    
+    @staticmethod
+    def read_observational_window():
+        pass
+    
     @staticmethod
     def random_walk_1D(n_steps, 
-                       ptp=1. # final peak-to-peak amplitude of the random walk
+                       ptp=1., # final peak-to-peak amplitude of the random walk
                        type_of_step='normal', # normal, unit, skewed-normal
                        skewness=5. # if using skewed-normal, this is the skewness parameter, 
                                    # it can be any real number (positive for dipper)
