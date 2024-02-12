@@ -170,7 +170,7 @@ class LightCurve:
             float: Peak-to-peak amplitude.
         """
         tail = round(0.05 * self.N)
-        return  np.median(self.mag.sort()[-tail:]) - np.median(self.mag.sort()[:tail])
+        return  np.median(np.sort(self.mag)[-tail:]) - np.median(np.sort(self.mag)[:tail])
         
       
 
