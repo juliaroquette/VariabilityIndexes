@@ -158,6 +158,20 @@ class LightCurve:
             float: Median value.
         """
         return np.median(self.mag)
+    
+    @property
+    def ptp(self):
+        """
+        Returns the peak-to-peak amplitude of the magnitude values.
+        This is defined as the difference between the median values for the datapoints 
+        in the 5%outermost tails of the distribution.
+
+        Returns:
+            float: Peak-to-peak amplitude.
+        """
+        tail = round(0.05 * self.N)
+        return  np.median(self.mag.sort()[-tail:]) - np.median(self.mag.sort()[:tail])
+        
       
 
 class FoldedLightCurve(LightCurve):
@@ -291,17 +305,31 @@ class SyntheticLightCurve:
             np.sin(2. * np.pi * (self.time - np.min(self.time))\
                 / period + phi_0)
     
-    def quasiperiodic_symmetric(self, std=0.02, ptp_amp= 1., period=10., phi=0.):
+    def quasiperiodic_symmetric(self, 
+                                std=0.05, 
+                                ptp_amp= None, 
+                                period=None, 
+                                phi_0=0.):
         '''
       quasiperiodic symmetric
             
         TO DO: We need to add a few constraints to the degree of quasiperiodicity
         (for example, it has to be smaller than a fraction of the amplitude)
         '''
+        if ptp_amp is None:
+            ptp_amp = self.ptp_amp
+            warnings.warn(f'quasiperiodic_symmetric: \n Using class default value of {self.ptp_amp}')
+        if period is None:
+            period = self.period
+            warnings.warn(f'quasiperiodic_symmetric: \n Using class default value of {self.ptp_amp}')          
         
-        amp_t = self.random_walk_1D(len(self.time), ptp_amp, type_of_step='normal')
+        amp_t = self.random_walk_1D(n_steps=len(self.time),
+                                    ptp=ptp_amp,
+                                    std=std,
+                                    type_of_step='normal')
+        print(ptp_amp, max(amp_t), min(amp_t))
         self.mag_qps = self._noisy_mag +\
-            0.5 * amp_t * np.sin(2 * np.pi * (self.time - np.min(self.time)) / period + phi) 
+            0.5 * amp_t * np.sin(2 * np.pi * (self.time - np.min(self.time)) / period + phi_0) 
     
     def eclipsing_binary(self, 
            ptp_amp = None, 
@@ -341,14 +369,20 @@ class SyntheticLightCurve:
         self.mag_eb[secondary_eclipse] -= secondary_fraction * primary_eclipse_depth * np.sin(phi_)
     
     def AATau(self, 
-           ptp_amp = 0.3, 
-           period=8., 
+           ptp_amp = None, 
+           period=None, 
            dip_width=0.9, #in terms of phase
            dip_start = 0.05    # Start time of the eclipse
            ):
         '''
         Generates a lc with for a AA Tau-like lightcurve
         '''
+        if ptp_amp is None:
+            ptp_amp = self.ptp_amp
+            warnings.warn(f'periodic_symmetric: \n Using class default value of {self.ptp_amp}')
+        if period is None:
+            period = self.period
+            warnings.warn(f'periodic_symmetric: \n Using class default value of {self.ptp_amp}')            
         assert dip_width < 1, "Dip-width must be smaller than 1"
         # assert primary_eclipse_start + eclipse_duration < 0.5, "First eclipse must happen in the first half of the period"
         self.mag_AATau = self._noisy_mag.copy()
@@ -359,122 +393,123 @@ class SyntheticLightCurve:
         self.mag_AATau[dip_in] -= abs(ptp_A[dip_in]) * np.sin(phi_)
     
     
-    def quasiperiodic_dipper(self, 
-                             ptp_amp, 
-                             amp_std, 
-                             period, 
-                             dip_factor):
-        """
-        Calculate the quasi-periodic dipper magnitude.
+    # def quasiperiodic_dipper(self, 
+    #                          ptp_amp, 
+    #                          amp_std, 
+    #                          period, 
+    #                          dip_factor):
+    #     """
+    #     Calculate the quasi-periodic dipper magnitude.
 
-        Parameters:
-        - t: Time array
-        - amp_mean: Mean amplitude of the random semi-amplitude
-        - amp_std: Standard deviation of the random semi-amplitude
-        - period: Period of the sine wave
-        - dip_factor: Dip factor quantifying dip strength
+    #     Parameters:
+    #     - t: Time array
+    #     - amp_mean: Mean amplitude of the random semi-amplitude
+    #     - amp_std: Standard deviation of the random semi-amplitude
+    #     - period: Period of the sine wave
+    #     - dip_factor: Dip factor quantifying dip strength
 
-        Returns:
-        - mag_qpd: Quasi-periodic dipper magnitude
-        """
-        ptp_A = self.random_walk_1D(len(self.time), ptp_amp)
+    #     Returns:
+    #     - mag_qpd: Quasi-periodic dipper magnitude
+    #     """
+    #     ptp_A = self.random_walk_1D(len(self.time), ptp_amp)
 
-        amp_rand = np.random.normal(amp_mean, amp_std, len(t))
+    #     amp_rand = np.random.normal(amp_mean, amp_std, len(t))
 
-        term1 = amp_rand/2 * np.sin(2 * np.pi * t / period)
-        term2 = 0.5 * dip_factor * np.sin(2 * np.pi * t / period) * (1 - np.sin(2 * np.pi * t / period))
+    #     term1 = amp_rand/2 * np.sin(2 * np.pi * t / period)
+    #     term2 = 0.5 * dip_factor * np.sin(2 * np.pi * t / period) * (1 - np.sin(2 * np.pi * t / period))
 
-        mag_qpd = term1 + term2 + np.random.normal(0, 0.05, len(self.time))
+    #     mag_qpd = term1 + term2 + np.random.normal(0, 0.05, len(self.time))
 
-        self.mag_qpd = self._noisy_mag + mag_qpd
+    #     self.mag_qpd = self._noisy_mag + mag_qpd
     
-    def aperiodic_dippers(self, num_dips=3,
-                          dip_depth_range=(0.3, 1), 
-                          dip_width_range=(0.5, 2.5),
-                          amp = 1):
-        """
-        Generate a synthetic light curve with aperiodic dips. 
-        Based on a random walk.
-        """
+    # def aperiodic_dippers(self, num_dips=3,
+    #                       dip_depth_range=(0.3, 1), 
+    #                       dip_width_range=(0.5, 2.5),
+    #                       amp = 1):
+    #     """
+    #     Generate a synthetic light curve with aperiodic dips. 
+    #     Based on a random walk.
+    #     """
     
-        rand_walk = np.cumsum(np.random.randn(len(self.time)))
+    #     rand_walk = np.cumsum(np.random.randn(len(self.time)))
 
-        for _ in range(num_dips):
-            dip_position = np.random.randint(0, len(self.time))
-            dip_depth    = np.random.uniform(*dip_depth_range)
-            dip_width    = np.random.uniform(*dip_width_range)
+    #     for _ in range(num_dips):
+    #         dip_position = np.random.randint(0, len(self.time))
+    #         dip_depth    = np.random.uniform(*dip_depth_range)
+    #         dip_width    = np.random.uniform(*dip_width_range)
 
-            gaussian_peak = dip_depth * np.exp(-((self.time - dip_position) / (dip_width / 2))**2)
-            rand_walk    -= gaussian_peak
+    #         gaussian_peak = dip_depth * np.exp(-((self.time - dip_position) / (dip_width / 2))**2)
+    #         rand_walk    -= gaussian_peak
 
-        # Normalize rand_walk to have a peak-to-peak amplitude of 1
-        normalized_rand_walk = (rand_walk - np.min(rand_walk)) / (np.max(rand_walk) - np.min(rand_walk))
+    #     # Normalize rand_walk to have a peak-to-peak amplitude of 1
+    #     normalized_rand_walk = (rand_walk - np.min(rand_walk)) / (np.max(rand_walk) - np.min(rand_walk))
 
-        # Scale with self.amp and add self.med_mag
-        self.mag_apd = self._noisy_mag + normalized_rand_walk * amp
+    #     # Scale with self.amp and add self.med_mag
+    #     self.mag_apd = self._noisy_mag + normalized_rand_walk * amp
         
     
-    def periodic_bursting(self):
-        pass
+    # def periodic_bursting(self):
+    #     pass
     
-    def quasiperiodic_bursting(self, std=0.02, ptp_amp=1, period=8., burst_factor=2):
-        '''
-        Generates a quasi periodic burst light curve with amplitude changing over time.
-        Amplitude is higher on the upper part of the sine (bursts).
+    # def quasiperiodic_bursting(self, std=0.02, ptp_amp=1, period=8., burst_factor=2):
+    #     '''
+    #     Generates a quasi periodic burst light curve with amplitude changing over time.
+    #     Amplitude is higher on the upper part of the sine (bursts).
 
-        Args:
-            std: std of Gaussian for overall amplitude variation
-            amp, frequency : parameters of the sine
-            burst_factor: factor controlling burstiness (higher values result in stronger bursts)
+    #     Args:
+    #         std: std of Gaussian for overall amplitude variation
+    #         amp, frequency : parameters of the sine
+    #         burst_factor: factor controlling burstiness (higher values result in stronger bursts)
 
-        Returns:
-            mag_qpb
-        '''
+    #     Returns:
+    #         mag_qpb
+    #     '''
 
-        # Calculate cumulative amplitude with burstiness
-        random_steps = np.random.normal(0, std, len(self.time))
-        amp_t = np.cumsum(random_steps) + ptp_amp
-        self.mag_qpb = self._noisy_mag + amp_t + burst_factor * 0.5 * (1 + np.sin(2 * np.pi * (self.time - min(self.time) / period)))
+    #     # Calculate cumulative amplitude with burstiness
+    #     random_steps = np.random.normal(0, std, len(self.time))
+    #     amp_t = np.cumsum(random_steps) + ptp_amp
+    #     self.mag_qpb = self._noisy_mag + amp_t + burst_factor * 0.5 * (1 + np.sin(2 * np.pi * (self.time - min(self.time) / period)))
 
     
-    def aperiodic_bursting(self, num_bursts=3, burst_depth_range=(0.3, 1.), burst_width_range=(.5, 2.5), ptp_amp = 1):
-        """
-        Generate a synthetic light curve with aperiodic bursts.
-        Based on a random walk.
-        """
-        rand_walk = np.cumsum(np.random.randn(len(self.time)))
+    # def aperiodic_bursting(self, num_bursts=3, burst_depth_range=(0.3, 1.), burst_width_range=(.5, 2.5), ptp_amp = 1):
+    #     """
+    #     Generate a synthetic light curve with aperiodic bursts.
+    #     Based on a random walk.
+    #     """
+    #     rand_walk = np.cumsum(np.random.randn(len(self.time)))
 
-        for _ in range(num_bursts):
-            burst_position = np.random.randint(0, len(self.time))
-            burst_depth    = np.random.uniform(*burst_depth_range)
-            burst_width    = np.random.uniform(*burst_width_range)
+    #     for _ in range(num_bursts):
+    #         burst_position = np.random.randint(0, len(self.time))
+    #         burst_depth    = np.random.uniform(*burst_depth_range)
+    #         burst_width    = np.random.uniform(*burst_width_range)
 
-            gaussian_peak = burst_depth * np.exp(-((self.time - burst_position) / (burst_width / 2))**2)
-            rand_walk    -= gaussian_peak
+    #         gaussian_peak = burst_depth * np.exp(-((self.time - burst_position) / (burst_width / 2))**2)
+    #         rand_walk    -= gaussian_peak
 
-        # Normalize rand_walk to have a peak-to-peak amplitude of 1
-        normalized_rand_walk = (rand_walk - np.min(rand_walk)) / (np.max(rand_walk) - np.min(rand_walk))
+    #     # Normalize rand_walk to have a peak-to-peak amplitude of 1
+    #     normalized_rand_walk = (rand_walk - np.min(rand_walk)) / (np.max(rand_walk) - np.min(rand_walk))
 
-        # Scale with self.amp and add self.med_mag
-        self.mag_apb = self._noisy_mag + normalized_rand_walk * ptp_amp
+    #     # Scale with self.amp and add self.med_mag
+    #     self.mag_apb = self._noisy_mag + normalized_rand_walk * ptp_amp
         
-    def multiperiodic():
-        pass
+    # def multiperiodic():
+    #     pass
     
-    @staticmethod
-    def new_observational_window():
-        pass
+    # @staticmethod
+    # def new_observational_window():
+    #     pass
     
-    @staticmethod
-    def read_observational_window():
-        pass
+    # @staticmethod
+    # def read_observational_window():
+    #     pass
     
     @staticmethod
     def random_walk_1D(n_steps, 
                        ptp=1., # final peak-to-peak amplitude of the random walk
                        type_of_step='normal', # normal, unit, skewed-normal
-                       skewness=5. # if using skewed-normal, this is the skewness parameter, 
+                       skewness=5., # if using skewed-normal, this is the skewness parameter, 
                                    # it can be any real number (positive for dipper)
+                        std = None
                        ):
         """
         Perform a 1-dimensional random walk.
@@ -492,14 +527,20 @@ class SyntheticLightCurve:
         References:
         - Random Walk: https://en.wikipedia.org/wiki/Random_walk
         """
+        if std is None:
+            std = 1/3.
         if type_of_step == 'normal':
-            steps = np.random.normal(loc=0, scale=1/3, size=n_steps)
+            steps = np.random.normal(loc=0, scale=std, size=n_steps)
         elif type_of_step == 'unit':
             steps = np.random.choice([-1, 1], size=n_steps)
         elif type_of_step == 'skewed-normal':
-            steps = ss.skewnorm.rvs(loc=0, scale=1/3, a=skewness, size=n_steps)
+            steps = ss.skewnorm.rvs(loc=0, scale=std, a=skewness, size=n_steps)
         else:
             raise ValueError('Invalid type of step, possible values are: normal, unit, skewed-normal')
-        positions = np.cumsum(steps)
+        positions = np.cumsum(steps) + ptp
         ptp_0 = positions.max() - positions.min()
-        return positions * (ptp / ptp_0)
+        return (positions - positions.min()) * (ptp / ptp_0) - 0.5 * ptp
+        # return positions
+
+#    random_steps     = np.random.normal(0, std, len(time))            
+    # amp_t            = np.cumsum(random_steps) + amp
