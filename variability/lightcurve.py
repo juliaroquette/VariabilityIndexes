@@ -193,11 +193,17 @@ class FoldedLightCurve(LightCurve):
     """
 
     def __init__(self,
-                 time,
-                 mag,
-                 err,
-                 timescale,
+                 time=None,
+                 mag=None,
+                 err=None,
+                 timescale=None,
+                 lc=None,
                  mask=None):
+        if lc is not None:
+            time = lc.time
+            mag = lc.mag
+            err = lc.err
+        assert timescale is not None, "A timescale must be provided"
         super().__init__(time, mag, err, mask=mask)
         self.timescale = timescale 
         # Calculate the phase values
@@ -387,6 +393,10 @@ class SyntheticLightCurve:
         # assert primary_eclipse_start + eclipse_duration < 0.5, "First eclipse must happen in the first half of the period"
         self.mag_AATau = self._noisy_mag.copy()
         phase =  (self.time - min(self.time))/period - np.floor((self.time - min(self.time))/period)
+        # generates amplitudes for each phase
+        n_phase = np.floor((self.time - min(self.time))/period)
+        
+        #
         dip_in = np.logical_and(phase >= dip_start, phase <= dip_start + dip_width)
         phi_ = (phase[dip_in] - dip_start) * np.pi / dip_width
         ptp_A = self.random_walk_1D(len(self.time), ptp_amp)
@@ -537,10 +547,12 @@ class SyntheticLightCurve:
             steps = ss.skewnorm.rvs(loc=0, scale=std, a=skewness, size=n_steps)
         else:
             raise ValueError('Invalid type of step, possible values are: normal, unit, skewed-normal')
-        positions = np.cumsum(steps) + ptp
-        ptp_0 = positions.max() - positions.min()
-        return (positions - positions.min()) * (ptp / ptp_0) - 0.5 * ptp
-        # return positions
+        
+        positions = np.cumsum(steps)
+        tail = round(0.05 * len(positions)) 
+        ptp_0 = np.median(np.sort(positions)[-tail:]) - np.median(np.sort(positions)[:tail])
+        return (positions - np.median(np.sort(positions)[-tail:])) * (ptp / ptp_0)
+
 
 #    random_steps     = np.random.normal(0, std, len(time))            
     # amp_t            = np.cumsum(random_steps) + amp
