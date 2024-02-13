@@ -34,7 +34,9 @@ Last update: 02-02-2024
 """
 import numpy as np
 from variability.lightcurve import LightCurve, FoldedLightCurve
+from variability.filtering import WaveForm
 import scipy.stats as ss
+from warnings import warn
 
 class VariabilityIndex:
     def __init__(self, lc, **kargs):
@@ -90,8 +92,7 @@ class VariabilityIndex:
     
     @property    
     def Abbe(self):
-        print('Not implemented yet')
-        return None
+        raise NotImplementedError("This hasn't been implemented yet.")
 
     # this is bugged     
     # @property   
@@ -174,9 +175,9 @@ class VariabilityIndex:
     @property
     def kurtosis(self):
         return ss.kurtosis(self.lc.mag)
-    
 
-    def Q_index(self, lc_phased):
+
+    def Q_index(self, timescale, waveform_method='savgol'):
         """
         Calculates the Q-index which measures the level of periodicity in the light-curve.
 
@@ -189,9 +190,10 @@ class VariabilityIndex:
         - Q-index float: The calculated Q-index.
 
         """
-        if not hasattr(my_instance, 'timescale'):
-        # raise 
-            raise TypeError("lc must be an instance of FoldedLightCurve with a timescale attribute")
-        else:
-            return (np.std(residual_mag)**2 - np.mean(err_phased)**2)/(np.std(mag_phased)**2 - np.mean(err_phased)**2)
+        self.lc_p = FoldedLightCurve(lc=self.lc, timescale=timescale)
+        residual_mag = WaveForm(self.lc_p, method=waveform_method).residual_magnitude()
+        # if not hasattr(my_instance, 'timescale'):
+            # raise TypeError("lc must be an instance of FoldedLightCurve with a timescale attribute")
+        # else: 
+        return (np.std(residual_mag)**2 - np.mean(self.lc_p.err_phased)**2)/(np.std(self.lc_p.mag_phased)**2 - np.mean(self.lc_p.err_phased)**2)
     
