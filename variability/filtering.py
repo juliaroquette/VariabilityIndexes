@@ -141,7 +141,7 @@ class Filtering:
 
 
 class WaveForm:
-    def __init__(self, folded_lc, type=''):
+    def __init__(self, folded_lc, method=''):
         # self.phase, self.mag_pahsed, self.err_pahsed
         if not isinstance(folded_lc, FoldedLightCurve):
             raise TypeError("lc must be an instance of LightCurve")
