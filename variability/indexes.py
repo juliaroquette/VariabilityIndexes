@@ -24,7 +24,6 @@ class VariabilityIndex:
        
         timescale = kwargs.get('timescale', NotImplementedError("automatic timescale not implemented yet"))
         waveform_method = kwargs.get('waveform_method', 'uneven_savgol')
-        # print('Using', waveform_method, 'method')
     
         self.Q_index = self.Q_index(parent=self, timescale=timescale, waveform_method=waveform_method)
         
@@ -71,7 +70,7 @@ class VariabilityIndex:
             # defines a folded light-curve object
             self.lc_p = FoldedLightCurve(lc=self.parent.lc, timescale=self._timescale)
             # estimates the residual magnitude
-            return WaveForm(self.lc_p, method=self._waveform_method).residual_magnitude()
+            return WaveForm(self.lc_p, waveform_type=self._waveform_method).residual_magnitude()
             
         @property
         def timescale(self):
@@ -81,7 +80,6 @@ class VariabilityIndex:
         def timescale(self, new_timescale):
             if new_timescale > 0.:
                 self._timescale = new_timescale
-                print(self._timescale)
             else:
                 raise ValueError("Please enter a valid _positive_ timescale")
         
