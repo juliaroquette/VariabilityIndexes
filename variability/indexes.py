@@ -6,11 +6,10 @@ from Cody et al. 2014
 
 Last update: Mon Feb 19 2024
 """
+
 import numpy as np
 from variability.lightcurve import LightCurve, FoldedLightCurve
 from variability.filtering import WaveForm
-import scipy.stats as ss
-from warnings import warn
 
 class VariabilityIndex:
     def __init__(self, lc, **kwargs):
