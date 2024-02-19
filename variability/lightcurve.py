@@ -143,20 +143,6 @@ class LightCurve:
             float: Median value.
         """
         return np.median(self.mag)
-    
-    @property
-    def ptp(self):
-        """
-        Returns the peak-to-peak amplitude of the magnitude values.
-        This is defined as the difference between the median values for the data points 
-        in the 5% outermost tails of the distribution.
-
-        Returns:
-            float: Peak-to-peak amplitude.
-        """
-        tail = round(0.05 * self.N)
-        return  np.median(np.sort(self.mag)[-tail:]) - np.median(np.sort(self.mag)[:tail])
-        
       
 
 class FoldedLightCurve(LightCurve):
