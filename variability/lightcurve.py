@@ -222,15 +222,15 @@ class SyntheticLightCurve:
     
     """
     def __init__(self, 
-                 **kargs):
+                 **kwargs):
 
         # check if an observational window was passed as input        
-        if 'time' in kargs.keys():
-            mask = np.where(np.isfinite(kargs['time']))[0]
-            self.time = np.asarray(kargs['time'], dtype=float)[mask]
+        if 'time' in kwargs.keys():
+            mask = np.where(np.isfinite(kwargs['time']))[0]
+            self.time = np.asarray(kwargs['time'], dtype=float)[mask]
         else:
-            assert 'survey_window' in kargs.keys(), "Either a time array or survey_window keyword must be provided"
-            if kargs['survey_window'] == 'K2':
+            assert 'survey_window' in kwargs.keys(), "Either a time array or survey_window keyword must be provided"
+            if kwargs['survey_window'] == 'K2':
                 """ 
                 Based on a typical light-curve from K2 as in Cody+ 2018AJ....156...71C
                 """
@@ -244,7 +244,7 @@ class SyntheticLightCurve:
                 rms_noise = 0.0018
                 self.time = np.arange(0, timespan, cadence)
 
-            elif kargs['survey_window'] == 'CoRoT':
+            elif kwargs['survey_window'] == 'CoRoT':
                 """ 
                 Based on a typical light-curve from CoRoT as in Cody+ 2014AJ....147...82
                 """
@@ -257,19 +257,19 @@ class SyntheticLightCurve:
                 noise_level = 0.01
                 rms_noise = 0.01
                 self.time = np.arange(0, timespan, cadence)
-            elif kargs['survey_window'] == 'TESS':
+            elif kwargs['survey_window'] == 'TESS':
                 raise NotImplementedError
-            elif kargs['survey_window'] == 'Rubin':
+            elif kwargs['survey_window'] == 'Rubin':
                 raise NotImplementedError
-            elif kargs['survey_window'] == 'ZTF':
+            elif kwargs['survey_window'] == 'ZTF':
                 raise NotImplementedError
-            elif kargs['survey_window'] == 'ASAS-SN':
+            elif kwargs['survey_window'] == 'ASAS-SN':
                 raise NotImplementedError
-            elif kargs['survey_window'] == 'GaiaDR3':
+            elif kwargs['survey_window'] == 'GaiaDR3':
                 raise NotImplementedError
-            elif kargs['survey_window'] == 'GaiaDR4':
+            elif kwargs['survey_window'] == 'GaiaDR4':
                 raise NotImplementedError
-            elif kargs['survey_window'] == 'AllWISE':
+            elif kwargs['survey_window'] == 'AllWISE':
                 raise NotImplementedError                
             else:
                 raise ValueError('Invalid survey window, possible values are: K2, TESS, Rubin, ZTF, ASAS-SN, GaiaDR3, GaiaDR4, AllWISE, CoRoT')
@@ -283,13 +283,13 @@ class SyntheticLightCurve:
         #
         # Defines some parameters for the light-curves
         #
-        if 'ptp_amp' in kargs.keys():
-            self.ptp_amp = kargs['ptp_amp']
+        if 'ptp_amp' in kwargs.keys():
+            self.ptp_amp = kwargs['ptp_amp']
         else:
             self.ptp_amp = 0.1
             warnings.warn(f'Peak-to-peak amplitude not provided, using default value of {self.ptp_amp}')
-        if 'period' in kargs.keys():
-            self.period = kargs['period']
+        if 'period' in kwargs.keys():
+            self.period = kwargs['period']
         else:
             self.period = 8.
             warnings.warn(f'Period not provided, using default value of {self.period}')

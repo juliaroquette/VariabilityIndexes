@@ -266,7 +266,7 @@ class WaveForm:
             raise ValueError("Method _{0}_ not implemented.".format(self._waveform_type))
         return self._lc.mag_phased - waveform
 
-def uneven_savgol(x, y, window, polynom):
+def uneven_savgol_(x, y, window, polynom):
     """
     Applies a Savitzky-Golay filter to y with non-uniform spacing
     as defined in x
@@ -370,7 +370,7 @@ def uneven_savgol(x, y, window, polynom):
 
     return y_smoothed
 
-def uneven_savgol_(x, y, window, polynom):
+def uneven_savgol(x, y, window, polynom):
     """
     Applies a Savitzky-Golay filter to y with non-uniform spacing
     as defined in x
