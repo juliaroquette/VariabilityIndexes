@@ -143,7 +143,6 @@ class LightCurve:
             float: Median value.
         """
         return np.median(self.mag)
-      
 
 class FoldedLightCurve(LightCurve):
     """
