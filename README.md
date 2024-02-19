@@ -1,28 +1,12 @@
-**@juliaroquette** Package under development for deriving Q&M indexes for Gaia DR3 light-curves.
+**@juliaroquette** This is a simplified version of the pacakge for deriving Q&M indexes, which keeps only the parts required for analysing Gaia DR3 light-curves. This should, in principle, work as a reference for Màté to translate it into Java. 
 
-**Last Update**: 22 January 2024
+The `./jupyter/test.ipynb` Jupyter Notebook contains a very simple application test for Màté to use as a reference. 
 
+The code itself is located in the folder `./variability`:
+- `./variability/lightcurve.py` contains classes to read light-curves into two types of objects: `LightCurve` (simple light-curve) or `FoldedLightCurve` (it is just like a Light-curve, but has a characteristic `timescale`, hence it includes extra attributes related to the phase-folded light-curve for this `timescale`.
+- `./variability/indexes.py` contains a class called `VariabilityIndex`, which takes in  `LightCurve` or  `FoldedLightCurve` objects and use two internal classes to estimate the Q&M indexes.
+- `./variability/filtering.py` contains two classes related to data-filtering:
+  - `Filtering` contains a few filtering methods that may be useful later on, although we are not using it at this initial moment.
+  - `WaveForm` is a filtering class that takes in `FoldedLightCurve` objects and estimate a statistical waveform for them, based on a choice of method (`waveform_type`). At the moment, our tests indicate we will be using the method `uneven_savgol`, which is defined at the end of `./variability/filtering.py`.
 
-
-TO DO:
-
-General:
-- include sample of reference Q & M for Orion stars
-- include sample of reference Q & M for synthetic light-curves
-- include script file for reading light-curves and calculating Q & M. 
-
-
-- gaia:
-    - Add class for reading Orion Light-curves
-    - Add Jupyter notebook for downloading Orion Light-Curves
-- variability
-    - Add .py with Q&M implementation
-    - Add .py for filtering
-    - Add .py for periodicity & timescales
-
-- Jupyter notebook:
-  - Waveform estimation section 
-    - (Chloé to add info)
-  - Filtering Section 
-    - (Clhoé to add info)
-  - Add examples of waveform for validation
+**Last Update**: 22 February 2024
