@@ -39,22 +39,20 @@ import scipy.stats as ss
 from warnings import warn
 
 class VariabilityIndex:
-    def __init__(self, lc, **kargs):
+    def __init__(self, lc, **kwargs):
         if not isinstance(lc, LightCurve):
             raise TypeError("lc must be an instance of LightCurve")
         self.lc = lc
         
+        M_percentile = kwargs.get('M_percentile', 10.)
+        M_is_flux = kwargs.get('M_is_flux', False)
         
-        if 'M_percenile' in kargs.keys():
-            M_percenile = kargs['M_percenile']
-        else:
-            M_percenile = 10.
-        if 'M_is_flux' in kargs.keys():
-            M_is_flux = kargs['M_is_flux']
-        else:
-            M_is_flux = False
-        
-        self.M_index = self.M_index(self, percentile=M_percenile, is_flux=M_is_flux)
+        self.M_index = self.M_index(parent=self,percentile=M_percentile, is_flux=M_is_flux)
+       
+        timescale = kwargs.get('timescale', NotImplementedError("automatic timescale not implemented yet"))
+        waveform_method = kwargs.get('waveform_method', 'uneven_savgol')
+    
+        self.Q_index = self.Q_index(parent=self, timescale=timescale, waveform_method=waveform_method)
         
  
     class M_index:
@@ -66,7 +64,9 @@ class VariabilityIndex:
 
         @property
         def percentile(self):
-            
+            """ 
+            Percentile used to calculate the M-index 
+            """
             return self._percentile
 	
         @percentile.setter
@@ -74,12 +74,9 @@ class VariabilityIndex:
             if (new_percentile > 0) and (new_percentile < 49.):
                 self._percentile = new_percentile
             else:
-                print("Please enter a valid percentile (between 0. and 49.)")
-       
-        @percentile.deleter
-        def percentile(self):
-            del self._percentile
+                raise ValueError("Please enter a valid percentile (between 0. and 49.)")
 
+        @property
         def get_percentile_mask(self):
             return (self.parent.lc.mag <= \
                                 np.percentile(self.parent.lc.mag, self._percentile))\
@@ -88,7 +85,7 @@ class VariabilityIndex:
                                
         @property
         def value(self):
-            return (1 - 2*int(self.is_flux))*(np.mean(self.parent.lc.mag[self.get_percentile_mask()]) - self.parent.lc.median)/self.parent.lc.std
+            return (1 - 2*int(self.is_flux))*(np.mean(self.parent.lc.mag[self.get_percentile_mask]) - self.parent.lc.median)/self.parent.lc.std
     
     @property    
     def Abbe(self):
@@ -177,23 +174,50 @@ class VariabilityIndex:
         return ss.kurtosis(self.lc.mag)
 
 
-    def Q_index(self, timescale, waveform_method='savgol'):
-        """
-        Calculates the Q-index which measures the level of periodicity in the light-curve.
+    class Q_index:
+        def __init__(self, parent, timescale, waveform_method='savgol'):
+            self.parent = parent
+            self._timescale = timescale
+            self._waveform_method = waveform_method
 
-        Parameters:
-        mag_phased (array-like): Array of phase-folded magnitudes for the "raw" light-curve.
-        residual_mag (array-like): Array of phase-folded residual magnitudes after waveform-subtraction
-        err_phased (array-like): Array of errors for the phase-folded light-curve.
+        @property        
+        def get_residual(self):
+            # defines a folded light-curve object
+            self.lc_p = FoldedLightCurve(lc=self.parent.lc, timescale=self._timescale)
+            # estimates the residual magnitude
+            return WaveForm(self.lc_p, waveform_type=self._waveform_method).residual_magnitude()
+            
+        @property
+        def timescale(self):
+            return self._timescale
+        
+        @timescale.setter
+        def timescale(self, new_timescale):
+            if new_timescale > 0.:
+                self._timescale = new_timescale
+            else:
+                raise ValueError("Please enter a valid _positive_ timescale")
+        
+        @property
+        def waveform_method(self):
+            return self._waveform_method
+        
+        @waveform_method.setter
+        def waveform_method(self, new_waveform_method):
+            implemented_waveforms = ['savgol',
+                                       'circular_rolling_average_number',
+                                       'circular_rolling_average_phase',
+                                       'H22', 'Cody', 'uneven_savgol'
+                                       ]
+            if new_waveform_method in implemented_waveforms:
+                self._waveform_method = new_waveform_method
+            else:
+                raise ValueError("Please enter a valid method:", implemented_waveforms)
 
-        Returns:
-        - Q-index float: The calculated Q-index.
-
-        """
-        self.lc_p = FoldedLightCurve(lc=self.lc, timescale=timescale)
-        residual_mag = WaveForm(self.lc_p, method=waveform_method).residual_magnitude()
-        # if not hasattr(my_instance, 'timescale'):
-            # raise TypeError("lc must be an instance of FoldedLightCurve with a timescale attribute")
-        # else: 
-        return (np.std(residual_mag)**2 - np.mean(self.lc_p.err_phased)**2)/(np.std(self.lc_p.mag_phased)**2 - np.mean(self.lc_p.err_phased)**2)
-    
+        @property
+        def value(self):
+            """
+            calculates the Q-index
+            """
+            return (np.std(self.get_residual)**2 - np.mean(self.lc_p.err_phased)**2)\
+                /(np.std(self.lc_p.mag_phased)**2 - np.mean(self.lc_p.err_phased)**2)
