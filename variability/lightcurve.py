@@ -9,8 +9,6 @@ Last update: 19 Feb 2024
 """
 
 import numpy as np
-import scipy.stats as ss
-import warnings
 np.random.seed(42)
 
 class LightCurve:
