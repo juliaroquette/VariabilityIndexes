@@ -553,6 +553,69 @@ class SyntheticLightCurve:
         ptp_0 = np.median(np.sort(positions)[-tail:]) - np.median(np.sort(positions)[:tail])
         return (positions - np.median(np.sort(positions)[-tail:])) * (ptp / ptp_0)
 
+    @staticmethod
+   def Ornstein_Uhlenbeck(time,
+                           theta,
+                           mu,
+                           sigma 
+                           ):
+        """
+        Implements a mean-reverting stochastic process.
+        
+        Ornstein-Uhlenbeck process (OU process):
+        https://en.wikipedia.org/wiki/Ornstein%E2%80%93Uhlenbeck_process
+        
+        OU-process stochastic differential equation:
+        -> dXt = theta * (mu - Xt) dt + sigma dWt
+        where:
+        - Xt is the state of the process at time t
+        - theta is the "rate of mean reversion"
+        - mu is the mean value of the process
+        - sigma is the volatility of the process
+        - Wt is a Wiener process (Brownian motion)
+        
+        This can be solved using the Euler-Maruyama solution:
+        https://en.wikipedia.org/wiki/Euler%E2%80%93Maruyama_method
+        
+        for a stochastic differential equation:
+            -> dXt = a(Xt, t) * dt + b(Xt, t) * dWt
+        with initial condition X0 = x0, the approximation to the solution X is
+        a Markov chain {Xt} with time increment dt:
+            1-> dt = T/N for an evenly spaced interval [0, T]. Although here 
+                I am inputing the time array, so I am using the time array to 
+                calculate dt
+            2-> X0 = mu 
+                I am imposing that the initial condition is actually the mean
+                of the process
+            3-> for i = 1, 2, ..., N:
+                X[n+1] = X[n] + a(X[n], t[n]) * dt + b(X[n], t[n]) * dW[n]
+                where dW[n] = W[n+1] - W[n] ~ N(0, dt) (Normal distributed 
+                                                with mean 0 and variance dt)
+        Translating this to the OU-process:
+            -> a(X[n], t) = theta * (mu - X[n])
+            -> b(X[n], t) = sigma
+            -> dW[n] = W[n+1] - W[n] ~ N(0, dt)
+        
+        """
+        dt = np.diff(time)
+        mag = np.zeros_like(timem dtype=float)
+        
+        def a_Xnt(theta,
+                  mag,
+                  mu):
+            return theta * (mu - mag)
+        
+        def b_Xnt(sigma):
+            return sigma
+        
+        def dW(dt):
+            """
+            Implementing dW like that guarantees that dW is calculate for the
+            current dt. This makes sure the correct variance properties are kept.
+            """
+            return np.random.normal(loc=0, scale=np.sqrt(dt))
+        
+        mag[0] = mu
+        mag[1:] = mag[:-1] + a_Xnt(theta, mag[:-1],  mu) * dt + b_Xnt(sigma) * dW(dt)
+        return mag
 
-#    random_steps     = np.random.normal(0, std, len(time))            
-    # amp_t            = np.cumsum(random_steps) + amp
