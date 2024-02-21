@@ -554,10 +554,10 @@ class SyntheticLightCurve:
         return (positions - np.median(np.sort(positions)[-tail:])) * (ptp / ptp_0)
 
     @staticmethod
-   def Ornstein_Uhlenbeck(time,
-                           theta,
-                           mu,
-                           sigma 
+    def Ornstein_Uhlenbeck(time,
+                          tau=10.,
+                          mu=15,
+                           sigma=0.1 
                            ):
         """
         Implements a mean-reverting stochastic process.
@@ -566,13 +566,22 @@ class SyntheticLightCurve:
         https://en.wikipedia.org/wiki/Ornstein%E2%80%93Uhlenbeck_process
         
         OU-process stochastic differential equation:
-        -> dXt = theta * (mu - Xt) dt + sigma dWt
+        -> dXt = theta * (mu - Xt) dt + sigma * dWt
         where:
         - Xt is the state of the process at time t
         - theta is the "rate of mean reversion"
         - mu is the mean value of the process
         - sigma is the volatility of the process
         - Wt is a Wiener process (Brownian motion)
+        
+        In this data-science ebook Chapter 13, section 4:
+        https://github.com/ipython-books/cookbook-2nd/
+        I found a version of this equation that is parametrised as a function
+        of a time-scale tau, rather than theta, which can be interpreted as 
+        the mean time-reverting tendency of the process. 
+        For this, we can use the relationship:
+        -> theta = 1/tau
+        -> sigma = sigma_ * sqrt(2/tau)
         
         This can be solved using the Euler-Maruyama solution:
         https://en.wikipedia.org/wiki/Euler%E2%80%93Maruyama_method
@@ -591,31 +600,32 @@ class SyntheticLightCurve:
                 X[n+1] = X[n] + a(X[n], t[n]) * dt + b(X[n], t[n]) * dW[n]
                 where dW[n] = W[n+1] - W[n] ~ N(0, dt) (Normal distributed 
                                                 with mean 0 and variance dt)
-        Translating this to the OU-process:
-            -> a(X[n], t) = theta * (mu - X[n])
-            -> b(X[n], t) = sigma
+        Translating this to the modified version of the OU-process:
+            -> a(X[n], t) =  (mu - X[n]) / tau
+            -> b(X[n], t) = sigma * sqrt(2/tau)
             -> dW[n] = W[n+1] - W[n] ~ N(0, dt)
         
-        """
-        dt = np.diff(time)
-        mag = np.zeros_like(timem dtype=float)
         
-        def a_Xnt(theta,
+        """
+        dt = time[1:] - time[:-1]
+        mag = np.full(len(time), mu, dtype=float) #I am imposing that the initial condition is actually de mean of the process
+        
+        def a_Xnt(tau,
                   mag,
                   mu):
-            return theta * (mu - mag)
+            return (mu - mag) / tau
         
-        def b_Xnt(sigma):
-            return sigma
+        def b_Xnt(sigma, tau):
+            return sigma * np.sqrt(2/tau)
         
-        def dW(dt):
+        def dW(dt_):
             """
             Implementing dW like that guarantees that dW is calculate for the
             current dt. This makes sure the correct variance properties are kept.
             """
-            return np.random.normal(loc=0, scale=np.sqrt(dt))
+            return np.random.normal(loc=0, scale=np.sqrt(dt_))
         
-        mag[0] = mu
-        mag[1:] = mag[:-1] + a_Xnt(theta, mag[:-1],  mu) * dt + b_Xnt(sigma) * dW(dt)
+        dWs = dW(dt)
+        mag[1:] = mag[:-1] + a_Xnt(tau, mag[:-1],  mu) * dt + b_Xnt(sigma, tau) * dWs
         return mag
 
