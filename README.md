@@ -28,3 +28,27 @@ Where the attributes `time`, `mag`, and `err` are numpy-arrays with the same len
 - `time_max`: Maximum value of the observation times.
 - `time_min`: Minimum value of the observation times.
 - `ptp`: Peak-to-peak amplitude of the magnitude values. Defined as the difference between the median values for the datapoints in the 5% outermost tails of the distribution.
+
+## `FoldedLightCurve` class
+
+
+```python
+  lc_f = FoldedLightCurve(time=time, mag=mag, err=err, timescale=timescale)
+```
+
+where `timescale` is a timescale to be used for phase-folding the light-curve (for example, a variability period).
+
+Alternatively:
+
+```python
+  lc_f = FoldedLightCurve(lc=lc, timescale=timescale)
+```
+Additionally to the attributes inherited from the `LightCurve`object, a `FoldedLightCurve`light curve has the following additional attributes:
+
+- `timescale`: The timescale used for folding the light curve. Can be a variability period or any characteristic timescale inferred for the light-curve (This can be inferred using the `timescale` module)
+- `phase`: The phase values of the folded light curve (between 0 and 1).
+- `mag_pahsed`: The magnitude values of the folded light curve, sorted based on phase.
+- `err_pahsed`: The error values of the folded light curve, sorted based on phase.
+
+
+## `SyntheticLightCurve`
