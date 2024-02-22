@@ -2,7 +2,12 @@
 
 **Last Update**: 22 February 2024
 
+In this current version, one can import and use it by doing:
 
+```python
+import sys
+sys.path.append('PAT/TO/THE/PACKAGE/LOCATION')  
+```
 
 # `lightcurve` module:
 
@@ -11,6 +16,7 @@ Provides tools for loading light-curves as objects. Three distinct classes relat
 ## `LightCurve` class
 
 ```python
+  from variability.lightcurve import LightCurve
   lc = LightCurve(time, mag, err, mask=None, is_flux=False)
 ```
 
@@ -33,6 +39,7 @@ Where the attributes `time`, `mag`, and `err` are numpy-arrays with the same len
 
 
 ```python
+  from variability.lightcurve import  FoldedLightCurve
   lc_f = FoldedLightCurve(time=time, mag=mag, err=err, timescale=timescale)
 ```
 
@@ -52,3 +59,19 @@ Additionally to the attributes inherited from the `LightCurve`object, a `FoldedL
 
 
 ## `SyntheticLightCurve`
+
+**@juliaroquette** Still under implementation, will allow to generate synthetic light-curves for given observational windows. 
+
+```python 
+from variability.lightcurve import FoldedLightCurve
+```
+# `indexes`
+
+VariabilityIndex
+
+# 
+**@juliaroquette** mostly implemented, but still need polishing and debugging. 
+
+# `timescale`
+
+**@juliaroquette** Still under implementation, will include our codes for estimating timescales. 
