@@ -67,11 +67,29 @@ from variability.lightcurve import FoldedLightCurve
 ```
 # `indexes`
 
-VariabilityIndex
+## `VariabilityIndex``
 
-# 
+```python
+from variability.indexes import VariabilityIndex
+```
+
+# `filtering
 **@juliaroquette** mostly implemented, but still need polishing and debugging. 
+
+## `Filtering`
+
+```python
+from variability.filtering import Filtering
+```
+## `WaveForm`
+
+```python
+from variability.filtering import  WaveForm
+```
+
+## `uneven_savgol`
 
 # `timescale`
 
 **@juliaroquette** Still under implementation, will include our codes for estimating timescales. 
+
