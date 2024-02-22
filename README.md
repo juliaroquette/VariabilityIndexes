@@ -1,28 +1,30 @@
-**@juliaroquette** Package under development for deriving Q&M indexes for Gaia DR3 light-curves.
+**@juliaroquette** Package under development for deriving Q&M indexes (and a few other variability indexes) for any time type of light-curves.
 
-**Last Update**: 22 January 2024
-
-
-
-TO DO:
-
-General:
-- include sample of reference Q & M for Orion stars
-- include sample of reference Q & M for synthetic light-curves
-- include script file for reading light-curves and calculating Q & M. 
+**Last Update**: 22 February 2024
 
 
-- gaia:
-    - Add class for reading Orion Light-curves
-    - Add Jupyter notebook for downloading Orion Light-Curves
-- variability
-    - Add .py with Q&M implementation
-    - Add .py for filtering
-    - Add .py for periodicity & timescales
 
-- Jupyter notebook:
-  - Waveform estimation section 
-    - (Chloé to add info)
-  - Filtering Section 
-    - (Clhoé to add info)
-  - Add examples of waveform for validation
+# `lightcurve` module:
+
+Provides tools for loading light-curves as objects. Three distinct classes related to light-curves are currently included:
+
+## `LightCurve` class
+
+```python
+  lc = LightCurve(time, mag, err, mask=None, is_flux=False)
+```
+
+Where the attributes `time`, `mag`, and `err` are numpy-arrays with the same length providing the observational time, magnitudes and magnitude uncertainties respectively. Optionally a `mask` boolean array can be passed to filter out missing data or spurious observations. The `is_flux` attribute informs if the light-curve is in terms of magnitudes or fluxes (this is important when calculating M-indexes.)
+
+`LightCurve` objects have a series of properties:
+- `N` : Number of datapoints in the light curve.
+- `time_span`: Total time-span of the light curve ($t_{max}-t_{min}$).
+- `std`: Standard deviation of the magnitude values.
+- `mean` : Mean of the magnitude values.
+- `weighted_average`: Weighted average of the magnitude values.
+- `median`: Median of the magnitude values.
+- `min`: Minimum value of the magnitudes.
+- `max`: Maximum value of the magnitudes.
+- `time_max`: Maximum value of the observation times.
+- `time_min`: Minimum value of the observation times.
+- `ptp`: Peak-to-peak amplitude of the magnitude values. Defined as the difference between the median values for the datapoints in the 5% outermost tails of the distribution.
