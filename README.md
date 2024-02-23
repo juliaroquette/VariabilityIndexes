@@ -1,5 +1,9 @@
 **@juliaroquette** Package under development for deriving Q&M indexes (and a few other variability indexes) for any time type of light-curves.
 
+**TO DO list**
+- [] **@juliaroquette** It may be worth it consider the possibility of merging `LightCurve` and `FoldedLightCurve` into a single class. <- Consider that after the `timescale.py` package has been implemented. 
+- [] **@juliaroquette** Implement the Abbe variability index into `indexes.py`
+
 **Last Update**: 22 February 2024
 
 In this current version, one can import and use it by doing:
@@ -13,7 +17,23 @@ sys.path.append('PAT/TO/THE/PACKAGE/LOCATION')
 
 Provides tools for loading light-curves as objects. Three distinct classes related to light-curves are currently included:
 
+For example, let's consider the following light-curve:
+
+````python
+import numpy as np
+N = 100
+time = np.linspace(0, 80, N)
+err =  0.01 * np.random.random_sample(N)
+period = 10. 
+amplitude = 0.5
+noise =  np.random.normal(scale=0.05, size=N)
+mag_sin = 0.5 * amplitude * np.sin(2 * np.pi * time / period) + noise
+````
+
+
 ## `LightCurve` class
+
+To instantiate a `LightCurve` object:
 
 ```python
   from variability.lightcurve import LightCurve
@@ -38,18 +58,20 @@ Where the attributes `time`, `mag`, and `err` are numpy-arrays with the same len
 ## `FoldedLightCurve` class
 
 
+
 ```python
   from variability.lightcurve import  FoldedLightCurve
-  lc_f = FoldedLightCurve(time=time, mag=mag, err=err, timescale=timescale)
+  lc_f = FoldedLightCurve(time=time, mag=mag, err=err, timescale=period)
 ```
 
-where `timescale` is a timescale to be used for phase-folding the light-curve (for example, a variability period).
+where `timescale` is a timescale to be used for phase-folding the light-curve (for example, the variability period). 
 
 Alternatively:
 
 ```python
   lc_f = FoldedLightCurve(lc=lc, timescale=timescale)
 ```
+
 Additionally to the attributes inherited from the `LightCurve`object, a `FoldedLightCurve`light curve has the following additional attributes:
 
 - `timescale`: The timescale used for folding the light curve. Can be a variability period or any characteristic timescale inferred for the light-curve (This can be inferred using the `timescale` module)
@@ -69,9 +91,23 @@ from variability.lightcurve import FoldedLightCurve
 
 ## `VariabilityIndex``
 
+To instantiate a `VariabilityIndex` object:
+
 ```python
 from variability.indexes import VariabilityIndex
+
+var = VariabilityIndex(lc_p, timescale=period)
 ```
+
+you are expected to pass in a `LightCurve` object, or a `FoldedLightCurve` object. 
+
+**Note that some variability indexes, like the Q-index itself, require either a `timescale` argument or a `FoldedLightCurve` instance (which already have an instance `timescale`).
+
+
+
+### `VariabilityIndex.M_index``
+
+### `VariabilityIndex.Q_index``
 
 # `filtering
 **@juliaroquette** mostly implemented, but still need polishing and debugging. 
@@ -81,11 +117,40 @@ from variability.indexes import VariabilityIndex
 ```python
 from variability.filtering import Filtering
 ```
+
+### `Filtering.filter`
+
+### `Filtering.sigma_clip`
+
+### `Filtering.Cody_long_trend`
+
+### `Filtering.savgol_longtrend`
+
+### `Filtering.uneven_savgol`
+
+### `Filtering.smooth_per_timescale`
+
+### `Filtering.rolling_average`
+
 ## `WaveForm`
 
 ```python
 from variability.filtering import  WaveForm
 ```
+
+### `WaveForm.residual_magnitude`
+
+### `WaveForm.circular_rolling_average_number`
+
+### `WaveForm.savgol`
+
+### `WaveForm.circular_rolling_average_phase`
+
+### `WaveForm.waveform_H22`
+
+### `WaveForm.waveform_Cody`
+
+### `WaveForm.uneven_savgol`
 
 ## `uneven_savgol`
 
