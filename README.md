@@ -1,8 +1,12 @@
+---
+title: "variability package description"
+output: 
+  html_document:
+    number_sections: true
+---
+
 **@juliaroquette** Package under development for deriving Q&M indexes (and a few other variability indexes) for any time type of light-curves.
 
-**TO DO list**
-- [] **@juliaroquette** It may be worth it consider the possibility of merging `LightCurve` and `FoldedLightCurve` into a single class. <- Consider that after the `timescale.py` package has been implemented. 
-- [] **@juliaroquette** Implement the Abbe variability index into `indexes.py`
 
 **Last Update**: 22 February 2024
 
@@ -87,6 +91,13 @@ Additionally to the attributes inherited from the `LightCurve`object, a `FoldedL
 ```python 
 from variability.lightcurve import FoldedLightCurve
 ```
+
+
+## TO DO list
+- [] **@juliaroquette** It may be worth it consider the possibility of merging `LightCurve` and `FoldedLightCurve` into a single class. <- Consider that after the `timescale.py` package has been implemented. 
+
+
+
 # `indexes`
 
 ## `VariabilityIndex``
@@ -109,8 +120,12 @@ you are expected to pass in a `LightCurve` object, or a `FoldedLightCurve` objec
 
 ### `VariabilityIndex.Q_index``
 
+## TO DO list
+- [] **@juliaroquette** Implement the Abbe variability index into `indexes.py`
+
 # `filtering
 **@juliaroquette** mostly implemented, but still need polishing and debugging. 
+
 
 ## `Filtering`
 
