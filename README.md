@@ -201,5 +201,13 @@ from variability.filtering import  WaveForm
 
 # `timescale`
 
+
+## TO DO list
+- :white_large_square: **@juliaroquette** Polish Lomb Scargle 
+- :white_large_square: **@juliaroquette** Add Structure function
+<!-- - :white_large_square: **@juliaroquette**  -->
+<!-- - :white_large_square: **@juliaroquette**  -->
+
+
 **@juliaroquette** Still under implementation, will include our codes for estimating timescales. 
 
