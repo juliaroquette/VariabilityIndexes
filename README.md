@@ -1,10 +1,3 @@
----
-title: "variability package description"
-output: 
-  html_document:
-    number_sections: true
----
-
 **@juliaroquette** Package under development for deriving Q&M indexes (and a few other variability indexes) for any time type of light-curves.
 
 
@@ -16,6 +9,8 @@ In this current version, one can import and use it by doing:
 import sys
 sys.path.append('PAT/TO/THE/PACKAGE/LOCATION')  
 ```
+
+[[_TOC_]]
 
 # `lightcurve` module:
 
