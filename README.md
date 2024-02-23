@@ -89,7 +89,7 @@ from variability.lightcurve import FoldedLightCurve
 
 
 ## TO DO list
-- :white_large_square **@juliaroquette** It may be worth it consider the possibility of merging `LightCurve` and `FoldedLightCurve` into a single class. <- Consider that after the `timescale.py` package has been implemented. 
+- :white_large_square: **@juliaroquette** It may be worth it consider the possibility of merging `LightCurve` and `FoldedLightCurve` into a single class. <- Consider that after the `timescale.py` package has been implemented. 
 
 
 
@@ -116,7 +116,7 @@ you are expected to pass in a `LightCurve` object, or a `FoldedLightCurve` objec
 ### `VariabilityIndex.Q_index``
 
 ## TO DO list
-- :white_large_square **@juliaroquette** Implement the Abbe variability index into `indexes.py`
+- :white_large_square: **@juliaroquette** Implement the Abbe variability index into `indexes.py`
 
 # `filtering
 **@juliaroquette** mostly implemented, but still need polishing and debugging. 
