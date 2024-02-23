@@ -93,6 +93,33 @@ from variability.lightcurve import FoldedLightCurve
 <details>
 :white_large_square: **@juliaroquette** It may be worth it consider the possibility of merging `LightCurve` and `FoldedLightCurve` into a single class. <- Consider that after the `timescale.py` package has been implemented. 
 
+:white_large_square: read observational windows from file
+
+:white_large_square: Implement a list of observational windows
+  - :white_large_square: TESS
+  - :white_large_square: Rubin
+  - :white_large_square: ZTF
+  - :white_large_square: ASAS-SN
+  - :white_large_square: Gaia-DR3
+  - :white_large_square: Gaia-DR4
+  - :white_large_square: Gaia-DR5
+  - :white_large_square: AllWISE
+  - :white_large_square: input
+
+:white_large_square: Include waveforms 
+  - :white_large_square: PS
+  - :white_large_square: QPS
+  - :white_large_square: EB
+  - :white_large_square: AATAU
+  - :white_large_square: QPD
+  - :white_large_square: QPB
+  - :white_large_square: B
+  - :white_large_square: MP
+  - :white_large_square: LP
+
+:white_large_square: Function that generates a waveform for a refined timestep
+
+  - :white_large_square: Function that convolves the waveform to an observational window
 </details>
 
 # `indexes`
@@ -121,7 +148,7 @@ you are expected to pass in a `LightCurve` object, or a `FoldedLightCurve` objec
 - :white_large_square: **@juliaroquette** Implement the Abbe variability index into `indexes.py`
 
 # `filtering
-**@juliaroquette** mostly implemented, but still need polishing and debugging. 
+**@juliaroquette** mostly implemented, but still needs polishing and debugging. 
 
 
 ## `Filtering`
