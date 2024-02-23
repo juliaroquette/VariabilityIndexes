@@ -89,9 +89,11 @@ from variability.lightcurve import FoldedLightCurve
 
 
 ## TO DO list
-- :white_large_square: **@juliaroquette** It may be worth it consider the possibility of merging `LightCurve` and `FoldedLightCurve` into a single class. <- Consider that after the `timescale.py` package has been implemented. 
 
+<details>
+:white_large_square: **@juliaroquette** It may be worth it consider the possibility of merging `LightCurve` and `FoldedLightCurve` into a single class. <- Consider that after the `timescale.py` package has been implemented. 
 
+</details>
 
 # `indexes`
 
@@ -127,6 +129,7 @@ you are expected to pass in a `LightCurve` object, or a `FoldedLightCurve` objec
 ```python
 from variability.filtering import Filtering
 ```
+<details>
 
 ### `Filtering.filter`
 
@@ -142,11 +145,14 @@ from variability.filtering import Filtering
 
 ### `Filtering.rolling_average`
 
+</details>
+
 ## `WaveForm`
 
 ```python
 from variability.filtering import  WaveForm
 ```
+<details>
 
 ### `WaveForm.residual_magnitude`
 
@@ -161,6 +167,8 @@ from variability.filtering import  WaveForm
 ### `WaveForm.waveform_Cody`
 
 ### `WaveForm.uneven_savgol`
+
+</details>
 
 ## `uneven_savgol`
 
