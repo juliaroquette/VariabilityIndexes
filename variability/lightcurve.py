@@ -295,7 +295,6 @@ class SyntheticLightCurve:
                     mean_mag = 15. #18.
                     noise_level = 0.01 #0.02
                     rms_noise = 0.01 #0.02
-                    
                 self.read_observational_window(kwargs['survey_window'])
             elif kwargs['survey_window'] == 'ASAS-SN':
                 # if bool(faint):                
@@ -309,23 +308,46 @@ class SyntheticLightCurve:
                 # self.read_observational_window(kwargs['survey_window'])                
                 raise NotImplementedError
             elif kwargs['survey_window'] == 'GaiaDR3':
-                # mean_mag = 15. #18.
-                # noise_level = 0.01 #0.02
-                # rms_noise = 0.01 #0.02
-                # self.read_observational_window(kwargs['survey_window'])                
-                raise NotImplementedError
+                if bool(faint):
+                    mean_mag = 17.0 #12
+                    noise_level = 0.0050 #0.001
+                    rms_noise = 0.0050 # 0.001
+                else:
+                    mean_mag = 12.5
+                    noise_level = 0.0008
+                    rms_noise = 0.0008 
+                self.read_observational_window(kwargs['survey_window'])
             elif kwargs['survey_window'] == 'GaiaDR4':
-                # mean_mag = 15. #18.
-                # noise_level = 0.01 #0.02
-                # rms_noise = 0.01 #0.02
-                # self.read_observational_window(kwargs['survey_window'])                
-                raise NotImplementedError
-            elif kwargs['survey_window'] == 'AllWISE':
-                # mean_mag = 15. #18.
-                # noise_level = 0.01 #0.02
-                # rms_noise = 0.01 #0.02
-                # self.read_observational_window(kwargs['survey_window'])                
-                raise NotImplementedError                
+                if bool(faint):
+                    mean_mag = 17.0 #12
+                    noise_level = 0.0050 #0.001
+                    rms_noise = 0.0050 # 0.001
+                else:
+                    mean_mag = 12.5
+                    noise_level = 0.0008
+                    rms_noise = 0.0008 
+                self.read_observational_window(kwargs['survey_window'])
+            elif kwargs['survey_window'] == 'GaiaDR5':
+                if bool(faint):
+                    mean_mag = 17.0 #12
+                    noise_level = 0.0050 #0.001
+                    rms_noise = 0.0050 # 0.001
+                else:
+                    mean_mag = 12.5
+                    noise_level = 0.0008
+                    rms_noise = 0.0008 
+                self.read_observational_window(kwargs['survey_window'])                
+            # elif kwargs['survey_window'] == 'AllWISE':
+                # if bool(faint):
+                #     mean_mag = 17.0 #12
+                #     noise_level = 0.0050 #0.001
+                #     rms_noise = 0.0050 # 0.001
+                # else:
+                #     mean_mag = 12.5
+                #     noise_level = 0.0008
+                #     rms_noise = 0.0008 
+                # self.read_observational_window(kwargs['survey_window'])
+                # raise NotImplementedError                
             else:
                 raise ValueError('Invalid survey window, possible values are: K2, TESS, Rubin, ZTF, ASAS-SN, GaiaDR3, GaiaDR4, AllWISE, CoRoT')
         
