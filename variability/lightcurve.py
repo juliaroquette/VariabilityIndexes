@@ -13,6 +13,7 @@ Define a class/function that generates a sample of light-curves
 
 import numpy as np
 import scipy.stats as ss
+import pandas as pd
 import warnings
 np.random.seed(42)
 
@@ -35,6 +36,13 @@ class LightCurve:
         - mean (float): Mean of the magnitude values.
         - weighted_average (float): Weighted average of the magnitude values.
         - median (float): Median of the magnitude values.
+        - min (float): Minimum value of the magnitudes.
+        - max (float): Maximum value of the magnitudes.
+        - time_max (float): Maximum value of the observation times.
+        - time_min (float): Minimum value of the observation times.
+        - ptp (float): Peak-to-peak amplitude of the magnitude values. 
+                       Defined as the difference between the median values for the datapoints 
+                       in the 5% outermost tails of the distribution.
     """
 
     def __init__(self,
@@ -223,6 +231,7 @@ class SyntheticLightCurve:
     
     """
     def __init__(self, 
+                 faint=False,
                  **kwargs):
 
         # check if an observational window was passed as input        
@@ -238,11 +247,21 @@ class SyntheticLightCurve:
                 # 1 observation every 30 minutes
                 cadence = 30./60./24. 
                 # 78 days of observations
-                timespan = 78
+                timespan = 80
+                
+                    # Kp = 8--18 mag 
+                    # 10 - .15/100
+                    # 15  0.0032
+
                 # typical noise level is 1.8mmag at 16th Kp magnitude
-                mean_mag = 16.0
-                noise_level = 0.0018
-                rms_noise = 0.0018
+                if bool(faint):
+                    mean_mag = 15.
+                    noise_level = 0.0032
+                    rms_noise = 0.0032
+                else:
+                    mean_mag = 10.0 #15.
+                    noise_level = 0.0015 # 0.0032
+                    rms_noise = 0.0015 #0.0032
                 self.time = np.arange(0, timespan, cadence)
 
             elif kwargs['survey_window'] == 'CoRoT':
@@ -252,25 +271,60 @@ class SyntheticLightCurve:
                 # 1 observation every 512 s
                 cadence = 512./60./60/24. 
                 # just over 37 days of observations
-                timespan = 37.4
+                timespan = 38.68
                 # typical rms is 0.01-0.1 at 17th Kp magnitude
-                mean_mag = 16.0
-                noise_level = 0.01
-                rms_noise = 0.01
+                if bool(faint):
+                    mean_mag = 15.0 #12
+                    noise_level = 0.01 #0.001
+                    rms_noise = 0.01 # 0.001
+                else:
+                    mean_mag = 12.
+                    noise_level = 0.001
+                    rms_noise = 0.001  
                 self.time = np.arange(0, timespan, cadence)
             elif kwargs['survey_window'] == 'TESS':
                 raise NotImplementedError
             elif kwargs['survey_window'] == 'Rubin':
                 raise NotImplementedError
             elif kwargs['survey_window'] == 'ZTF':
-                raise NotImplementedError
+                if bool(faint):
+                    mean_mag = 18.
+                    noise_level = 0.02
+                    rms_noise = 0.02
+                else:
+                    mean_mag = 15. #18.
+                    noise_level = 0.01 #0.02
+                    rms_noise = 0.01 #0.02
+                    
+                self.read_observational_window(kwargs['survey_window'])
             elif kwargs['survey_window'] == 'ASAS-SN':
+                # if bool(faint):                
+                # mean_mag = 15. #18.
+                # noise_level = 0.01 #0.02
+                # rms_noise = 0.01 #0.02
+                # else:
+                # mean_mag = 15. #18.
+                # noise_level = 0.01 #0.02
+                # rms_noise = 0.01 #0.02
+                # self.read_observational_window(kwargs['survey_window'])                
                 raise NotImplementedError
             elif kwargs['survey_window'] == 'GaiaDR3':
+                # mean_mag = 15. #18.
+                # noise_level = 0.01 #0.02
+                # rms_noise = 0.01 #0.02
+                # self.read_observational_window(kwargs['survey_window'])                
                 raise NotImplementedError
             elif kwargs['survey_window'] == 'GaiaDR4':
+                # mean_mag = 15. #18.
+                # noise_level = 0.01 #0.02
+                # rms_noise = 0.01 #0.02
+                # self.read_observational_window(kwargs['survey_window'])                
                 raise NotImplementedError
             elif kwargs['survey_window'] == 'AllWISE':
+                # mean_mag = 15. #18.
+                # noise_level = 0.01 #0.02
+                # rms_noise = 0.01 #0.02
+                # self.read_observational_window(kwargs['survey_window'])                
                 raise NotImplementedError                
             else:
                 raise ValueError('Invalid survey window, possible values are: K2, TESS, Rubin, ZTF, ASAS-SN, GaiaDR3, GaiaDR4, AllWISE, CoRoT')
@@ -295,6 +349,28 @@ class SyntheticLightCurve:
             self.period = 8.
             warnings.warn(f'Period not provided, using default value of {self.period}')
 
+    def read_observational_window(self, survey_window):
+        """
+        Create a SyntheticLightCurve object from a file.
+
+        Args:
+            filename (str): The name of the file to read from.
+
+        Returns:
+            SyntheticLightCurve: The light curve object.
+        """
+        observational_windows_filenames = {
+            'AllWISE': 'AllWISE.csv',
+            'gaia_DR3': 'gaia_DR3.csv',
+            'gaia_DR4': 'gaia_DR4.csv',
+            'gaia_DR5': 'gaia_DR5.csv',
+            'TESS': 'TESS.csv',
+            'ZTF': 'ZTF.csv',
+        }
+        df = pd.read_csv(observational_windows_filenames[survey_window])
+        self.time = df['jd_norm'].to_numpy()
+        
+    
     def periodic_symmetric(self, 
                            ptp_amp=None,
                            period=None, 
@@ -510,9 +586,7 @@ class SyntheticLightCurve:
     # def new_observational_window():
     #     pass
     
-    # @staticmethod
-    # def read_observational_window():
-    #     pass
+
     
     @staticmethod
     def random_walk_1D(n_steps, 
