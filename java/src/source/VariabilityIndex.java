@@ -30,6 +30,7 @@ import java.util.Arrays;
 import java.util.function.DoublePredicate;
 
 import org.apache.commons.math3.stat.descriptive.moment.Mean;
+import org.apache.commons.math3.stat.descriptive.moment.Variance;
 import org.apache.commons.math3.stat.descriptive.rank.Percentile;
 
 /**
@@ -37,13 +38,14 @@ import org.apache.commons.math3.stat.descriptive.rank.Percentile;
  * Java code to @juliaroquette's Python implementation.
  * 
  * @author Mate Madarasz
- * @version $Id$
+ * @version 1.0
  */
 
 @Getter
 public class VariabilityIndex {
 	private LightCurve lc;
 	private MIndex MIndex;
+	private QIndex qIndex;
 
 	/**
 	 * Constructs a VariabilityIndex instance for the given light curve.
@@ -54,12 +56,14 @@ public class VariabilityIndex {
 	 *                    magnitude.
 	 * @throws IllegalArgumentException if lc is null.
 	 */
-	public VariabilityIndex(LightCurve lc, double MPercentile, boolean MIsFlux) {
+	public VariabilityIndex(LightCurve lc, double MPercentile, boolean MIsFlux, double timescale,
+			String waveformMethod) {
 		if (lc == null) {
 			throw new IllegalArgumentException("lc must be an instance of LightCurve");
 		}
 		this.lc = lc;
 		this.MIndex = new MIndex(this, MPercentile, MIsFlux);
+		this.qIndex = new QIndex(this, timescale, waveformMethod);
 	}
 
 	/**
@@ -128,6 +132,69 @@ public class VariabilityIndex {
 			double std = this.parent.lc.getStd();
 
 			return (1 - 2 * (this.isFlux ? 1 : 0)) * (meanFilteredMag - median) / std;
+		}
+	}
+
+	/**
+	 * Inner class to calculate the Q-index
+	 */
+	@Getter
+	public class QIndex {
+		private double timescale;
+		private String waveformMethod;
+		private VariabilityIndex parent;
+
+		/**
+		 * Constructs a QIndex instance for the specified parent VariabilityIndex.
+		 *
+		 * @param parent         the parent VariabilityIndex instance.
+		 * @param timescale      the timescale to use for folding the light curve.
+		 * @param waveformMethod the method to analyze the waveform.
+		 */
+		public QIndex(VariabilityIndex parent, double timescale, String waveformMethod) {
+			this.parent = parent;
+			setTimescale(timescale);
+			this.waveformMethod = waveformMethod;
+		}
+		
+		/**
+	     * Sets the timescale and ensures it's a positive value.
+	     *
+	     * @param timescale the new timescale to set.
+	     */
+	    public void setTimescale(double timescale) {
+	        if (timescale > 0) {
+	            this.timescale = timescale;
+	        } else {
+	            throw new IllegalArgumentException("Please enter a valid positive timescale");
+	        }
+	    }
+		
+		/**
+		 * Calculates and returns the value of the Q-index.
+		 *
+		 * @return the calculated Q-index value.
+		 */
+		public double getValue() {
+			FoldedLightCurve flc = new FoldedLightCurve(lc.getTime(),
+					lc.getMag(),
+					lc.getErr(),
+					timescale,
+					lc.getMask());
+			
+			WaveForm waveForm = new WaveForm(flc, waveformMethod);
+			double[] residuals = waveForm.residualMagnitude();
+
+			Variance variance = new Variance();
+		    Mean mean = new Mean();
+
+		    double varResiduals = variance.evaluate(residuals);
+		    double varMagPhased = variance.evaluate(flc.getMagPhased());
+
+		    double meanErrPhased = mean.evaluate(flc.getErrPhased());
+		    double meanErrPhasedSquared = meanErrPhased * meanErrPhased;
+
+		    return (varResiduals - meanErrPhasedSquared) / (varMagPhased - meanErrPhasedSquared);
 		}
 	}
 

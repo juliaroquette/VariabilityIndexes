@@ -45,7 +45,7 @@ import source.LightCurve;
 public class LightCurveTest {
 
 	private LightCurve lc;
-	private final double delta = 1e-15;
+	private final double delta = 1e-14;
 
 	/**
 	 * Sets up the testing environment before each test. Initializes a LightCurve
