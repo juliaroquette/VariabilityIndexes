@@ -199,23 +199,36 @@ class FoldedLightCurve(LightCurve):
         phase (array-like): The phase values of the folded light curve.
         mag_pahsed (array-like): The magnitude values of the folded light curve, sorted based on phase.
         err_pahsed (array-like): The error values of the folded light curve, sorted based on phase.
+        waveform (array-like): The waveform of the folded light curve.
+        waveform_type (str): The type of waveform used for the folded light curve.
+        residual (array-like): The residual curve defined  the difference between 
+        the folded light curve and the waveform.
     """
 
     def __init__(self,
-                 time=None,
-                 mag=None,
-                 err=None,
                  timescale=None,
-                 lc=None,
-                 mask=None):
-        if lc is not None:
+                 **kwargs):
+        # makes sure this is also a LightCurve object
+        if 'lc' in kwargs.items():
             time = lc.time
             mag = lc.mag
             err = lc.err
-        assert timescale is not None, "A timescale must be provided"
+        elif all(key in kwargs for key in ['time', 'mag', 'err']):
+            time = kwargs['time']
+            mag = kwargs['mag']
+            err = kwargs['err']
+        else:
+            raise ValueError("Either a LightCurve object or time, mag and err arrays must be provided")
+        mask = kwargs.get('mask', None)
         super().__init__(time, mag, err, mask=mask)
+        # phasefold lightcurve to a given timescale
+        assert timescale is not None, "A timescale must be provided"
         self._timescale = timescale 
         self.get_phased_values()
+        # phasefold lightcurves have a waveform
+        self._waveform_method = kwargs.get('waveform_method', 'uneven_savgol')
+        self.waveform = self.get_waveform(waveform_type=self._waveform_method)
+        # n_point = kwargs.get('n_point',50)
     
     def get_phased_values(self):
         
@@ -227,16 +240,6 @@ class FoldedLightCurve(LightCurve):
         self.mag_phased = self.mag[sort]       
         self.err_phased = self.err[sort]
         
-    def get_waveform(self, **kwargs):
-        from variability.filtering import WaveForm
-        if 'waveform_type' in kwargs.keys():
-            waveform_type = kwargs['waveform_type']
-        else:
-            waveform_type = 'uneven_savgol'
-            warnings.warn('No waveform type provided, using default value of {0}'.format(waveform_type))
-        
-        return WaveForm(self, 
-                        waveform_type=waveform_type).get_waveform(**kwargs)
     @property
     def timescale(self):
         return self._timescale
@@ -248,6 +251,23 @@ class FoldedLightCurve(LightCurve):
             self._update_phased_data()
         else:
             raise ValueError("Please enter a valid _positive_ timescale")        
+        
+    def get_waveform(self, **kwargs):
+        from variability.filtering import WaveForm
+        if 'waveform_type' in kwargs.keys():
+            waveform_type = kwargs['waveform_type']
+        else:
+            waveform_type = 'uneven_savgol'
+            warnings.warn('No waveform type provided, using default value of {0}'.format(waveform_type))
+        
+        return WaveForm(self, 
+                        waveform_type=waveform_type).get_waveform(**kwargs)        
+
+    @property        
+    def get_residual(self, **kwargs):
+        from variability.filtering import WaveForm
+        # estimates the residual magnitude
+        return WaveForm(self.parent.lc, waveform_type=self._waveform_method).residual_magnitude(**kwargs)
 
 class SyntheticLightCurve:
     """
