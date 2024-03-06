@@ -214,9 +214,13 @@ class FoldedLightCurve(LightCurve):
             err = lc.err
         assert timescale is not None, "A timescale must be provided"
         super().__init__(time, mag, err, mask=mask)
-        self.timescale = timescale 
+        self._timescale = timescale 
+        self.get_phased_values()
+    
+    def get_phased_values(self):
+        
         # Calculate the phase values
-        phase = np.mod(self.time, self.timescale) / self.timescale
+        phase = np.mod(self.time, self._timescale) / self._timescale
         # Sort the phase and magnitude arrays based on phase values
         sort = np.argsort(phase)
         self.phase = phase[sort]
@@ -230,10 +234,20 @@ class FoldedLightCurve(LightCurve):
         else:
             waveform_type = 'uneven_savgol'
             warnings.warn('No waveform type provided, using default value of {0}'.format(waveform_type))
+        
         return WaveForm(self, 
-                        waveform_type=waveform_type, 
-                        **kwargs).get_waveform(waveform_type=waveform_type,
-                                               **kwargs)
+                        waveform_type=waveform_type).get_waveform(**kwargs)
+    @property
+    def timescale(self):
+        return self._timescale
+    
+    @timescale.setter
+    def timescale(self, new_timescale):
+        if new_timescale > 0.:
+            self._timescale = new_timescale
+            self._update_phased_data()
+        else:
+            raise ValueError("Please enter a valid _positive_ timescale")        
 
 class SyntheticLightCurve:
     """
@@ -383,8 +397,9 @@ class SyntheticLightCurve:
                 raise ValueError('Invalid survey window, possible values are: K2, TESS, Rubin, ZTF, ASAS-SN, GaiaDR3, GaiaDR4, AllWISE, CoRoT')
         
         self.n_epochs = len(self.time)
-        self.time.setflags(write=False)  # Set the array as read-only        
-        self._noisy_mag =  np.random.normal(loc=mean_mag, scale=noise_level, size=self.n_epochs)
+        self.time.setflags(write=False)  # Set the array as read-only      
+        self.err = abs(np.random.normal(loc=rms_noise, scale=noise_level, size=self.n_epochs))  
+        self._noisy_mag = mean_mag + 1.* self.err  # np.random.normal(loc=mean_mag, scale=noise_level, size=self.n_epochs)
         self.err = abs(np.random.normal(loc=rms_noise, scale=noise_level, size=self.n_epochs))
         self._noisy_mag.setflags(write=False)  # Set the array as read-only        
         self.err.setflags(write=False)  # Set the array as read-only
