@@ -193,6 +193,4 @@ class FoldedLightCurve(LightCurve):
             waveform_type = 'uneven_savgol'
             warnings.warn('No waveform type provided, using default value of {0}'.format(waveform_type))
         return WaveForm(self, 
-                        waveform_type=waveform_type, 
-                        **kwargs).get_waveform(waveform_type=waveform_type,
-                                               **kwargs)
+                        waveform_type=waveform_type).get_waveform(**kwargs)
