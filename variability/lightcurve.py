@@ -530,11 +530,11 @@ class SyntheticLightCurve:
         # Convert phase fraction to be eclipsed into appropriate radian values for the model
         phi_ = (phase[primary_eclipse] - primary_eclipse_start) * np.pi / eclipse_duration 
         # eclipse relevant parts of the light-curve
-        self.mag_eb[primary_eclipse] -= primary_eclipse_depth * \
+        self.mag_eb[primary_eclipse] += primary_eclipse_depth * \
             np.sin(phi_)
         # repeat for secondary eclipse
         phi_ = (phase[secondary_eclipse] - secondary_eclipse_start) * np.pi / eclipse_duration            
-        self.mag_eb[secondary_eclipse] -= secondary_fraction * primary_eclipse_depth * np.sin(phi_)
+        self.mag_eb[secondary_eclipse] += secondary_fraction * primary_eclipse_depth * np.sin(phi_)
     
     def AATau(self, 
            ptp_amp = None, 
