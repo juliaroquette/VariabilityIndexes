@@ -6,23 +6,26 @@ Module for computing variability timescales.
 
 import numpy as np
 import pandas as pd
-from variability.lightcurve import LightCurve
+
 from astropy.timeseries import LombScargle
 # from sklearn.gaussian_process         import GaussianProcessRegressor
 # from sklearn.gaussian_process.kernels import RBF
 
 
 class TimeScale:
-    def __init__(self, LightCurve):
+    def __init__(self, lc):
+        from variability.lightcurve import LightCurve
+        if not isinstance(lc, LightCurve):
+            raise TypeError("lc must be an instance of LightCurve")        
         # super().__init__(time, mag, err, mask=None)
-        self.lc = LightCurve
+        self.lc = lc
         
     def get_LSP_period(self,
                           fmin=1./250., 
                           fmax=1./0.5,
                           osf=5., 
                           periodogram=False, 
-                          fap=0.01):
+                          fap_prob=[0.001, 0.01, 0.1]):
         """
         Simple Period estimation code using Lomb-Scargle. 
         This adopts an heuristic approach for the frequency grid where,
@@ -56,14 +59,14 @@ class TimeScale:
         """
         # define the base for the Lomb-Scargle
         ls = LombScargle(self.lc.time, self.lc.mag)
-        frequency, power = ls.autopower(samples_per_peak=ofs,
+        frequency, power = ls.autopower(samples_per_peak=osf,
                                         minimum_frequency=fmin,
                                         maximum_frequency=fmax) 
         # get False alarm probability levels
-        FAP_level = ls.false_alarm_level(prob, method='baluev', 
+        FAP_level = ls.false_alarm_level(fap_prob, method='baluev', 
                                          minimum_frequency=fmin, 
                                          maximum_frequency=fmax, 
-                                         samples_per_peak=ofs)
+                                         samples_per_peak=osf)
         if bool(periodogram):
             return frequency, power, FAP_level
         else:
