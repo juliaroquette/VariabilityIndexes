@@ -15,6 +15,7 @@ import numpy as np
 import scipy.stats as ss
 import pandas as pd
 import warnings
+from variability.filtering import WaveForm
 np.random.seed(42)
 
 class LightCurve:
@@ -222,6 +223,14 @@ class FoldedLightCurve(LightCurve):
         self.phase = phase[sort]
         self.mag_phased = self.mag[sort]       
         self.err_phased = self.err[sort]
+        
+    def get_waveform(self, **kwargs):
+        if 'waveform_type' in kwargs.keys():
+            waveform_type = kwargs['waveform_type']
+        else:
+            waveform_type = 'uneven_savgol'
+            warnings.warn('No waveform type provided, using default value of {0}'.format(waveform_type))
+        return WaveForm(self, waveform_type=waveform_type, **kwargs)
 
 class SyntheticLightCurve:
     """
@@ -296,17 +305,26 @@ class SyntheticLightCurve:
                     noise_level = 0.01 #0.02
                     rms_noise = 0.01 #0.02
                 self.read_observational_window(kwargs['survey_window'])
-            elif kwargs['survey_window'] == 'ASAS-SN':
-                # if bool(faint):                
-                # mean_mag = 15. #18.
-                # noise_level = 0.01 #0.02
-                # rms_noise = 0.01 #0.02
-                # else:
-                # mean_mag = 15. #18.
-                # noise_level = 0.01 #0.02
-                # rms_noise = 0.01 #0.02
-                # self.read_observational_window(kwargs['survey_window'])                
-                raise NotImplementedError
+            elif kwargs['survey_window'] == 'ASAS-SN-V':
+                if bool(faint):                
+                    mean_mag = 15. 
+                    noise_level = 0.04
+                    rms_noise = 0.04 #0.02
+                else:
+                    mean_mag = 12
+                    noise_level = 0.02
+                    rms_noise = 0.02
+                self.read_observational_window(kwargs['survey_window'])
+            elif kwargs['survey_window'] == 'ASAS-SN-g':
+                if bool(faint):                
+                    mean_mag = 15. 
+                    noise_level = 0.04
+                    rms_noise = 0.04 #0.02
+                else:
+                    mean_mag = 12
+                    noise_level = 0.02
+                    rms_noise = 0.02
+                self.read_observational_window(kwargs['survey_window'])        
             elif kwargs['survey_window'] == 'GaiaDR3':
                 if bool(faint):
                     mean_mag = 17.0 #12
@@ -327,6 +345,16 @@ class SyntheticLightCurve:
                     noise_level = 0.0008
                     rms_noise = 0.0008 
                 self.read_observational_window(kwargs['survey_window'])
+            elif kwargs['survey_window'] == 'GaiaDR4-geq20':
+                if bool(faint):
+                    mean_mag = 17.0 #12
+                    noise_level = 0.0050 #0.001
+                    rms_noise = 0.0050 # 0.001
+                else:
+                    mean_mag = 12.5
+                    noise_level = 0.0008
+                    rms_noise = 0.0008 
+                self.read_observational_window(kwargs['survey_window'])                
             elif kwargs['survey_window'] == 'GaiaDR5':
                 if bool(faint):
                     mean_mag = 17.0 #12
@@ -353,7 +381,7 @@ class SyntheticLightCurve:
         
         self.n_epochs = len(self.time)
         self.time.setflags(write=False)  # Set the array as read-only        
-        self._noisy_mag = mean_mag + np.random.normal(scale=noise_level, size=self.n_epochs)
+        self._noisy_mag =  np.random.normal(loc=mean_mag, scale=noise_level, size=self.n_epochs)
         self.err = abs(np.random.normal(loc=rms_noise, scale=noise_level, size=self.n_epochs))
         self._noisy_mag.setflags(write=False)  # Set the array as read-only        
         self.err.setflags(write=False)  # Set the array as read-only
@@ -383,13 +411,17 @@ class SyntheticLightCurve:
         """
         observational_windows_filenames = {
             'AllWISE': 'AllWISE.csv',
-            'gaia_DR3': 'gaia_DR3.csv',
-            'gaia_DR4': 'gaia_DR4.csv',
-            'gaia_DR5': 'gaia_DR5.csv',
+            'GaiaDR3': 'gaia_DR3.csv',
+            'GaiaDR4': 'gaia_DR4.csv',
+            'GaiaDR4-geq20': 'gaia_DR4_high.csv',
+            'GaiaDR5': 'gaia_DR5.csv',
             'TESS': 'TESS.csv',
             'ZTF': 'ZTF.csv',
+            'ASAS-SN-V': 'ASAS-SN_V.csv',
+            'ASAS-SN-g': 'ASAS-SN_g.csv',
         }
-        df = pd.read_csv(observational_windows_filenames[survey_window])
+        df = pd.read_csv('../data/' + \
+            observational_windows_filenames[survey_window])
         self.time = df['jd_norm'].to_numpy()
         
     
