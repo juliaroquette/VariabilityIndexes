@@ -15,7 +15,6 @@ import numpy as np
 import scipy.stats as ss
 import pandas as pd
 import warnings
-from variability.filtering import WaveForm
 np.random.seed(42)
 
 class LightCurve:
@@ -225,12 +224,16 @@ class FoldedLightCurve(LightCurve):
         self.err_phased = self.err[sort]
         
     def get_waveform(self, **kwargs):
+        from variability.filtering import WaveForm
         if 'waveform_type' in kwargs.keys():
             waveform_type = kwargs['waveform_type']
         else:
             waveform_type = 'uneven_savgol'
             warnings.warn('No waveform type provided, using default value of {0}'.format(waveform_type))
-        return WaveForm(self, waveform_type=waveform_type, **kwargs)
+        return WaveForm(self, 
+                        waveform_type=waveform_type, 
+                        **kwargs).get_waveform(waveform_type=waveform_type,
+                                               **kwargs)
 
 class SyntheticLightCurve:
     """
