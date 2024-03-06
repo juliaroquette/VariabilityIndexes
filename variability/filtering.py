@@ -262,37 +262,13 @@ class WaveForm:
             waveform = self.uneven_savgol(window, polynom)
         else:
             raise ValueError("Method _{0}_ not implemented.".format(self._waveform_type))
-        return self._lc.mag_phased - waveform
+        return waveform
     
     def residual_magnitude(self, waveform_type='uneven_savgol', **kwargs):
         """
         Calculate the residual magnitude after waveform subtraction.
         """
-        if waveform_type == 'savgol':
-            #needs to catch kwarfgs
-            waveform = self.savgol(**kwargs)
-        elif waveform_type == 'Cody':
-            #needs to catch kwarfgs
-            waveform = self.waveform_Cody(**kwargs)
-        elif self._waveform_type == 'circular_rolling_average_phase':
-            wd_phase = kwargs.get('wd_phase', 0.1)
-            waveform = self.circular_rolling_average_phase(wd_phase=wd_phase)
-        elif self._waveform_type == 'circular_rolling_average_number':
-            window_size = kwargs.get('window_size', 0.1*self._lc.N)
-            waveform = self.circular_rolling_average_number(window_size=window_size)
-        elif self._waveform_type == 'H22':
-            kernel = kwargs.get('kernel', 4.)
-            waveform = self.waveform_H22(kernel=kernel)
-        elif self._waveform_type == 'uneven_savgol':
-            wd = round(0.1*self._lc.N)
-            if wd % 2 == 0:
-                wd += 1
-            window = kwargs.get('window', wd)
-            polynom = kwargs.get('polynom', 3)
-            waveform = self.uneven_savgol(window, polynom)
-        else:
-            raise ValueError("Method _{0}_ not implemented.".format(self._waveform_type))
-        return self._lc.mag_phased - waveform
+        return self._lc.mag_phased - self.get_waveform(self, waveform_type=waveform_type, **kwargs)
 
 def uneven_savgol_(x, y, window, polynom):
     """
