@@ -186,33 +186,16 @@ class LightCurve:
 class FoldedLightCurve(LightCurve):
     """
     Represents a folded light curve with time values folded for a given timescale.
-
-    Args:
-        time (array-like): The time values of the light curve.
-        mag (array-like): The magnitude values of the light curve.
-        err (array-like): The error values of the light curve.
-        timescale (float): The timescale used for folding the light curve.
-        mask (array-like, optional): The mask to apply to the light curve.
-
-    Attributes:
-        timescale (float): The timescale used for folding the light curve.
-        phase (array-like): The phase values of the folded light curve.
-        mag_pahsed (array-like): The magnitude values of the folded light curve, sorted based on phase.
-        err_pahsed (array-like): The error values of the folded light curve, sorted based on phase.
-        waveform (array-like): The waveform of the folded light curve.
-        waveform_type (str): The type of waveform used for the folded light curve.
-        residual (array-like): The residual curve defined  the difference between 
-        the folded light curve and the waveform.
     """
-
     def __init__(self,
                  timescale=None,
                  **kwargs):
+        from variability.filtering import WaveForm
         # makes sure this is also a LightCurve object
-        if 'lc' in kwargs.items():
-            time = lc.time
-            mag = lc.mag
-            err = lc.err
+        if 'lc' in kwargs:
+            time = kwargs['lc'].time
+            mag = kwargs['lc'].mag
+            err = kwargs['lc'].err
         elif all(key in kwargs for key in ['time', 'mag', 'err']):
             time = kwargs['time']
             mag = kwargs['mag']
@@ -224,14 +207,13 @@ class FoldedLightCurve(LightCurve):
         # phasefold lightcurve to a given timescale
         assert timescale is not None, "A timescale must be provided"
         self._timescale = timescale 
-        self.get_phased_values()
+        self._get_phased_values()
         # phasefold lightcurves have a waveform
-        self._waveform_method = kwargs.get('waveform_method', 'uneven_savgol')
-        self.waveform = self.get_waveform(waveform_type=self._waveform_method)
-        # n_point = kwargs.get('n_point',50)
-    
-    def get_phased_values(self):
-        
+        self._window_param = kwargs.get('window_param', {})
+        self.wf = WaveForm(self.phase, self.mag_phased)
+        self._get_waveform()
+
+    def _get_phased_values(self):
         # Calculate the phase values
         phase = np.mod(self.time, self._timescale) / self._timescale
         # Sort the phase and magnitude arrays based on phase values
@@ -248,26 +230,37 @@ class FoldedLightCurve(LightCurve):
     def timescale(self, new_timescale):
         if new_timescale > 0.:
             self._timescale = new_timescale
-            self._update_phased_data()
+            self._get_phased_values()
         else:
             raise ValueError("Please enter a valid _positive_ timescale")        
         
-    def get_waveform(self, **kwargs):
-        from variability.filtering import WaveForm
-        if 'waveform_type' in kwargs.keys():
-            waveform_type = kwargs['waveform_type']
-        else:
-            waveform_type = 'uneven_savgol'
-            warnings.warn('No waveform type provided, using default value of {0}'.format(waveform_type))
-        
-        return WaveForm(self, 
-                        waveform_type=waveform_type).get_waveform(**kwargs)        
+    def _get_waveform(self, 
+                      waveform_type='uneven_savgol', 
+                      waveform_params={}):
+        self._waveform_type = waveform_type
+        self._waveform_params = waveform_params
+        self.waveform = self.wf.get_waveform(waveform_type=self._waveform_type, 
+                                             waveform_params=waveform_params)
+        # phasefolded lightcurves also have a residual curve between the waveform and the lightcurve
+        self.residual = self.wf.residual_magnitude(waveform_type=waveform_type,
+                                                   waveform_params=waveform_params)
+    
+    # @property
+    # def waveform_type(self):
+        # return self._waveform_type
 
-    @property        
-    def get_residual(self, **kwargs):
-        from variability.filtering import WaveForm
-        # estimates the residual magnitude
-        return WaveForm(self.parent.lc, waveform_type=self._waveform_method).residual_magnitude(**kwargs)
+    # @waveform_type.setter
+    # def waveform_type(self, new_method):
+        # self._waveform_type = new_method
+        # self._get_waveform()
+    
+    # @property
+    # def waveform_param(self, **kwargs):
+        # return kwargs
+    
+    # @waveform_param.setter
+    # def waveform_param(self, **kwargs):
+        # self._get_waveform(**kwargs)
 
 class SyntheticLightCurve:
     """
