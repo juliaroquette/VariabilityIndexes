@@ -5,8 +5,6 @@ Module for computing variability timescales.
 """
 
 import numpy as np
-import pandas as pd
-
 from astropy.timeseries import LombScargle
 # from sklearn.gaussian_process         import GaussianProcessRegressor
 # from sklearn.gaussian_process.kernels import RBF
@@ -53,9 +51,7 @@ class TimeScale:
         else:
             frequency of the highest peak: float
             power of the highest peak: float
-            type_flag: [1] if less than 1% of FAP - interpret as period
-                       [0] if less than 10% - interpret as timescale
-                       [-1] if more than 10% - interpret as probably spurious
+            FAP_highest_peak: 0-1. float: False Alarm Probability for the highest peak
         """
         # define the base for the Lomb-Scargle
         ls = LombScargle(self.lc.time, self.lc.mag)
@@ -71,13 +67,11 @@ class TimeScale:
             return frequency, power, FAP_level
         else:
             highest_peak = power[np.argmax(power)]
-            if highest_peak >= FAP_level[0]:
-                type_flag = 1 # see it as a periodicity
-            elif highest_peak >= FAP_level[1]:
-                type_flag = 0 # see it as a timescale
-            else:
-                type_flag = -1 # see it as probably spurious
-            return frequency[np.argmax(power)], highest_peak, type_flag
+            FAP_highest_peak = ls.false_alarm_probability(power.max(),method='baluev', 
+                                         minimum_frequency=fmin, 
+                                         maximum_frequency=fmax, 
+                                         samples_per_peak=osf)
+            return frequency[np.argmax(power)], highest_peak, FAP_highest_peak
 
     def get_structure_function_timescale(self):
         pass
