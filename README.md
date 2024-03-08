@@ -91,6 +91,9 @@ from variability.lightcurve import FoldedLightCurve
 ## TO DO list
 
 <details>
+
+
+
 :white_large_square: **@juliaroquette** It may be worth it consider the possibility of merging `LightCurve` and `FoldedLightCurve` into a single class. <- Consider that after the `timescale.py` package has been implemented. 
 
 :white_large_square: read observational windows from file
@@ -98,16 +101,16 @@ from variability.lightcurve import FoldedLightCurve
 :white_large_square: Implement a list of observational windows
   - :white_large_square: TESS
   - :white_large_square: Rubin
-  - :white_large_square: ZTF
-  - :white_large_square: ASAS-SN
-  - :white_large_square: Gaia-DR3
-  - :white_large_square: Gaia-DR4
-  - :white_large_square: Gaia-DR5
-  - :white_large_square: AllWISE
+  - :heavy_check_mark: ZTF
+  - :heavy_check_mark: ASAS-SN (g and V)
+  - :heavy_check_mark: Gaia-DR3
+  - :heavy_check_mark: Gaia-DR4
+  - :heavy_check_mark: Gaia-DR5
+  - :heavy_check_mark: AllWISE
   - :white_large_square: input
 
 :white_large_square: Include waveforms 
-  - :white_large_square: PS
+  - :heavy_check_mark: PS
   - :white_large_square: QPS
   - :white_large_square: EB
   - :white_large_square: AATAU
@@ -203,8 +206,8 @@ from variability.filtering import  WaveForm
 
 
 ## TO DO list
-- :white_large_square: **@juliaroquette** Polish Lomb Scargle 
-- :white_large_square: **@juliaroquette** Add Structure function
+- :heavy_check_mark: **@juliaroquette** Polish Lomb Scargle 
+- :white_large_square: **@juliaroquette** Add Structure function (@Clhoe)
 <!-- - :white_large_square: **@juliaroquette**  -->
 <!-- - :white_large_square: **@juliaroquette**  -->
 
