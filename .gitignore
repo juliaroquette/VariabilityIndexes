@@ -3,3 +3,4 @@ testing_class.ipynb
 *.pyc
 data/raw
 *.DS_Store*
+[dev]*.ipynb
