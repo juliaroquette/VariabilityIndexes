@@ -148,49 +148,75 @@ class LightCurve:
 class FoldedLightCurve(LightCurve):
     """
     Represents a folded light curve with time values folded for a given timescale.
-
-    Args:
-        time (array-like): The time values of the light curve.
-        mag (array-like): The magnitude values of the light curve.
-        err (array-like): The error values of the light curve.
-        timescale (float): The timescale used for folding the light curve.
-        mask (array-like, optional): The mask to apply to the light curve.
-
-    Attributes:
-        timescale (float): The timescale used for folding the light curve.
-        phase (array-like): The phase values of the folded light curve.
-        mag_pahsed (array-like): The magnitude values of the folded light curve, sorted based on phase.
-        err_pahsed (array-like): The error values of the folded light curve, sorted based on phase.
     """
-
     def __init__(self,
-                 time=None,
-                 mag=None,
-                 err=None,
                  timescale=None,
-                 lc=None,
-                 mask=None):
-        if lc is not None:
-            time = lc.time
-            mag = lc.mag
-            err = lc.err
-        assert timescale is not None, "A timescale must be provided"
+                 **kwargs):
+        from variability.filtering import WaveForm
+        
+        # makes sure this is also a LightCurve object
+        if 'lc' in kwargs:
+            time = kwargs['lc'].time
+            mag = kwargs['lc'].mag
+            err = kwargs['lc'].err
+        elif all(key in kwargs for key in ['time', 'mag', 'err']):
+            time = kwargs['time']
+            mag = kwargs['mag']
+            err = kwargs['err']
+        else:
+            raise ValueError("Either a LightCurve object or time, mag and err arrays must be provided")
+        mask = kwargs.get('mask', None)
         super().__init__(time, mag, err, mask=mask)
-        self.timescale = timescale 
+        
+        # phasefold lightcurve to a given timescale
+        assert timescale is not None, "A timescale must be provided" #should I get a timescale automatically here?
+        self._timescale = timescale 
+        # print('FLC __init__ timescale', self._timescale)
+        self._get_phased_values()
+        
+        # phasefold lightcurves have a waveform
+        # define a WaveForm Object
+        self.wf = WaveForm(self.phase, self.mag_phased)
+        #  check if specific window parameters were passed as input
+        self._waveform_params = kwargs.get('waveform_params', {'window': round(.25*self.N),
+                                                    'polynom': 3})
+        # check if a specific waveform type was passed as input
+        self._waveform_type = kwargs.get('waveform_type', 'uneven_savgol')
+        self._get_waveform()
+
+    def _get_phased_values(self):
         # Calculate the phase values
-        phase = np.mod(self.time, self.timescale) / self.timescale
+        # print('FLC _get_phased_values timescale', self._timescale)
+        phase = np.mod(self.time, self._timescale) / self._timescale
         # Sort the phase and magnitude arrays based on phase values
         sort = np.argsort(phase)
         self.phase = phase[sort]
         self.mag_phased = self.mag[sort]       
         self.err_phased = self.err[sort]
 
-    def get_waveform(self, **kwargs):
-        from variability.filtering import WaveForm
-        if 'waveform_type' in kwargs.keys():
-            waveform_type = kwargs['waveform_type']
+    def _get_waveform(self, **kwargs):
+        # print('FLC _get_waveform timescale', self._timescale)
+        self.waveform = self.wf.get_waveform(waveform_type= kwargs.get('waveform_type', self._waveform_type), 
+                                             waveform_params=kwargs.get('waveform_params', self._waveform_params))
+        # print('lc wf', np.mean(self.waveform))
+        # phasefolded lightcurves also have a residual curve between the waveform and the lightcurve
+        self.residual = self.wf.residual_magnitude(self.waveform)        
+        
+    @property
+    def timescale(self):
+        return self._timescale
+    
+    @timescale.setter
+    def timescale(self, new_timescale):
+        if new_timescale > 0.:
+            print('ts setter mag_phase before', np.mean(self.mag_phased))
+            self._timescale = new_timescale
+            self._get_phased_values()
+            self._get_waveform()
+            print('ts setter mag_phase now', np.mean(self.mag_phased))
+            # print('lc', np.mean(self.mag_phased))
         else:
-            waveform_type = 'uneven_savgol'
-            warnings.warn('No waveform type provided, using default value of {0}'.format(waveform_type))
-        return WaveForm(self, 
-                        waveform_type=waveform_type).get_waveform(**kwargs)
+            raise ValueError("Please enter a valid _positive_ timescale")         
+        
+
+    
