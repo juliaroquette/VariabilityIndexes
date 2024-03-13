@@ -17,7 +17,6 @@ Last update: 19 Feb 2024
 
 import warnings
 import numpy as np
-from variability.lightcurve import LightCurve, FoldedLightCurve
 
 class Filtering:
     def __init__(self, lc):
@@ -30,6 +29,7 @@ class Filtering:
         Raises:
         - TypeError: If lc is not an instance of LightCurve.
         """
+        from variability.lightcurve import LightCurve
         if not isinstance(lc, LightCurve):
             raise TypeError("lc must be an instance of LightCurve")
         self.lc = lc
@@ -108,22 +108,18 @@ class Filtering:
         return smoothed_values
 
 class WaveForm:
-    def __init__(self, folded_lc, waveform_type='uneven_savgol'):
+    def __init__(self, phase, mag_phased):
         """
         Initialize the WaveForm class.
 
         Parameters:
-        - folded_lc (FoldedLightCurve): The folded light curve to be analyzed.
-        - method (str): The waveform analysis method to be used.
+        - phase (np.array): The phase of the folded light curve.
+        - mag_phased (np.array): The magnitude of the folded light curve.
 
-        Raises:
-        - TypeError: If folded_lc is not an instance of FoldedLightCurve.
         """
-        if not isinstance(folded_lc, FoldedLightCurve):
-            raise TypeError("lc must be an instance of LightCurve")
-        else:
-            self._lc = folded_lc
-        self._waveform_type = waveform_type
+        self.phase = phase
+        self.mag_phased = mag_phased
+        self.N = len(self.mag_phased)
   
     def circular_rolling_average_number(self, window_size=5):
         """
@@ -135,7 +131,7 @@ class WaveForm:
         Returns:
         - np.array: The circular rolling average waveform.
         """
-        extended_mag = np.concatenate((self._lc.mag_phased, self._lc.mag_phased, self._lc.mag_phased))
+        extended_mag = np.concatenate((self.mag_phased, self.mag_phased, self.mag_phased))
         extended_waveform = np.array([
             np.mean(extended_mag[i - int(0.5 * window_size):
                 i + int(np.round((0.5 * window_size)))])\
@@ -143,8 +139,9 @@ class WaveForm:
                         len(extended_mag) -\
                             int(np.round(0.5*window_size + 1)))])
         
-        return extended_waveform[self._lc.N - int(0.5 * window_size):
-            2 * self._lc.N - int(0.5 * window_size)]
+        return extended_waveform[self.N - int(0.5 * window_size):
+            2 * self.N - int(0.5 * window_size)]
+
 
     def circular_rolling_average_phase(self, wd_phase=0.1):
         """
@@ -156,30 +153,14 @@ class WaveForm:
         Returns:
         - np.array: The circular rolling average waveform based on phase.
         """
-        waveform = np.full(len(self._lc.phase), np.nan)
-        extended_phase = np.concatenate((self._lc.phase - 1, self._lc.phase, 1 + self._lc.phase))
-        extended_mag = np.concatenate((self._lc.mag_phased, self._lc.mag_phased, self._lc.mag_phased))
-        for i, p in enumerate(self._lc.phase):
+        waveform = np.full(len(self.phase), np.nan)
+        extended_phase = np.concatenate((self.phase - 1, self.phase, 1 + self.phase))
+        extended_mag = np.concatenate((self.mag_phased, self.mag_phased, self.mag_phased))
+        for i, p in enumerate(self.phase):
             select = np.where((extended_phase <= p + wd_phase/2.) & (extended_phase > p - wd_phase/2.))[0]
             waveform[i] = np.mean(extended_mag[select])
         return waveform
 
-    # def waveform_H22(self, kernel=4):
-    #     """
-    #     Calculate the waveform using the H22 method.
-
-    #     Parameters:
-    #     - kernel (int): The kernel size for the convolution.
-
-    #     Returns:
-    #     - np.array: The waveform calculated using the H22 method.
-    #     """
-    #     three_periods = np.concatenate((self._lc.mag_phased, self._lc.mag_phased, self._lc.mag_phased))
-    #     boxcar = Box1DKernel(len(self._lc.mag_phased) // kernel)
-    #     smooth_mag = convolve(three_periods, boxcar)
-    #     smooth_mag = smooth_mag[np.size(self._lc.mag_phased):2*np.size(self._lc.mag_phased)]
-    #     return smooth_mag
-    
     def uneven_savgol(self, window, polynom):
         """
         Apply a Savitzky-Golay filter to the folded light curve with non-uniform spacing.
@@ -195,44 +176,32 @@ class WaveForm:
         - ValueError: If the data size is smaller than the window size or if the window is not an odd integer.
         - TypeError: If window or polynom are not integers.
         """
-        x = np.concatenate((self._lc.phase - 1, self._lc.phase, 1 + self._lc.phase))
-        y = np.concatenate((self._lc.mag_phased, self._lc.mag_phased, self._lc.mag_phased)) 
-        return  uneven_savgol(x, y, window, polynom)  [self._lc.N:2*self._lc.N]
-    
-    def residual_magnitude(self, **kwargs):
-        """
-        Calculate the residual magnitude of the folded light curve.
+        x = np.concatenate((self.phase - 1, self.phase, 1 + self.phase))
+        y = np.concatenate((self.mag_phased, self.mag_phased, self.mag_phased)) 
+        return  uneven_savgol(x, y, window, polynom)  [self.N:2*self.N]
 
-        Parameters:
-        - waveform_type (str): The type of waveform analysis method to be used.
-        - **kwargs: Additional keyword arguments specific to each waveform analysis method.
-
-        Returns:
-        - np.array: The residual magnitude of the folded light curve.
-
-        Raises:
-        - ValueError: If the specified waveform analysis method is not implemented.
-        """
-        if self._waveform_type == 'circular_rolling_average_phase':
-            wd_phase = kwargs.get('wd_phase', 0.1)
+    def get_waveform(self, waveform_type='uneven_savgol', waveform_params={}):
+        if waveform_type == 'circular_rolling_average_phase':
+            wd_phase = waveform_params.get('wd_phase', 0.1)
             waveform = self.circular_rolling_average_phase(wd_phase=wd_phase)
-        elif self._waveform_type == 'circular_rolling_average_number':
-            window_size = kwargs.get('window_size', 0.1*self._lc.N)
+        elif waveform_type == 'circular_rolling_average_number':
+            window_size = waveform_params.get('window_size', 0.1*self.N)
             waveform = self.circular_rolling_average_number(window_size=window_size)
-        # elif self._waveform_type == 'H22':
-        #     kernel = kwargs.get('kernel', 4.)
-        #     waveform = self.waveform_H22(kernel=kernel)
-        elif self._waveform_type == 'uneven_savgol':
-            wd = round(0.1*self._lc.N)
-            if wd % 2 == 0:
-                wd += 1
-            window = kwargs.get('window', wd)
-            polynom = kwargs.get('polynom', 3)
+        elif waveform_type == 'uneven_savgol':
+            window = waveform_params.get('window', round(0.25*self.N))
+            if window % 2 == 0:
+                window += 1
+            polynom = waveform_params.get('polynom', 3)
             waveform = self.uneven_savgol(window, polynom)
         else:
             raise ValueError("Method _{0}_ not implemented.".format(self._waveform_type))
-        return self._lc.mag_phased - waveform
-
+        return waveform
+    
+    def residual_magnitude(self, waveform):
+        """
+        Calculate the residual magnitude after waveform subtraction.
+        """
+        return self.mag_phased - waveform
 
 def uneven_savgol(x, y, window, polynom):
     """
@@ -305,7 +274,4 @@ def uneven_savgol(x, y, window, polynom):
         y_smoothed[i] = np.dot(coeffs[0], y[i - half_window:i + half_window + 1])
 
     return y_smoothed
-
- 
-
 

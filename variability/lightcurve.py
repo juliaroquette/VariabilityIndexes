@@ -11,7 +11,8 @@ Last update: 19 Feb 2024
 import numpy as np
 import warnings
 np.random.seed(42)
-
+from variability.filtering import WaveForm
+ 
 class LightCurve:
     """
     Class representing a light curve.
@@ -152,7 +153,6 @@ class FoldedLightCurve(LightCurve):
     def __init__(self,
                  timescale=None,
                  **kwargs):
-        from variability.filtering import WaveForm
         
         # makes sure this is also a LightCurve object
         if 'lc' in kwargs:
@@ -198,7 +198,11 @@ class FoldedLightCurve(LightCurve):
     def timescale(self, new_timescale):
         if new_timescale > 0.:
             self._timescale = new_timescale
+            # update phase-folded values
             self._get_phased_values()
+            # update the waveform for the new timescale
+            self.wf = WaveForm(self.phase, self.mag_phased)
+            self._get_waveform()
         else:
             raise ValueError("Please enter a valid _positive_ timescale")        
         
