@@ -109,6 +109,16 @@ class LightCurve:
         return self.mag.mean()
     
     @property
+    def mean_err(self):
+        """
+        Returns the mean of the uncertainty values.
+
+        Returns:
+            float: Mean value.
+        """
+        return self.err.mean()    
+    
+    @property
     def max(self):
         """
         Returns the max value of the magnitudes.
@@ -191,26 +201,37 @@ class FoldedLightCurve(LightCurve):
                  timescale=None,
                  **kwargs):
         from variability.filtering import WaveForm
+        
         # makes sure this is also a LightCurve object
         if 'lc' in kwargs:
-            time = kwargs['lc'].time
-            mag = kwargs['lc'].mag
-            err = kwargs['lc'].err
+            super().__init__(kwargs['lc'].time, kwargs['lc'].mag, kwargs['lc'].err)
         elif all(key in kwargs for key in ['time', 'mag', 'err']):
-            time = kwargs['time']
-            mag = kwargs['mag']
-            err = kwargs['err']
+            super().__init__(kwargs['time'], kwargs['mag'], kwargs['err'], kwargs.get('mask', None))
         else:
             raise ValueError("Either a LightCurve object or time, mag and err arrays must be provided")
-        mask = kwargs.get('mask', None)
-        super().__init__(time, mag, err, mask=mask)
+        
+        # FlodedLightCurve needs a timescale
+        if timescale is not None:
+            self._timescale = timescale
+        else:
+            from variability.timescales import TimeScale
+            ts = TimeScale(lc=self.lc)
+            frequency_highest_peak, power_highest_peak, FAP_highest_peak = ts.get_LSP_period(periodogram=False)
+            self._timescale = 1./frequency_highest_peak
+            self.timescale_FAP = FAP_highest_peak*100
+            warnings.warn("Automatic timescale estimated from LSP - FAP: {0}".format(self.timescale_FAP))
+
         # phasefold lightcurve to a given timescale
-        assert timescale is not None, "A timescale must be provided"
-        self._timescale = timescale 
-        self._get_phased_values()
+        self._get_phased_values()        
+                
         # phasefold lightcurves have a waveform
-        self._window_param = kwargs.get('window_param', {})
+        # define a WaveForm Object
         self.wf = WaveForm(self.phase, self.mag_phased)
+        #  check if specific window parameters were passed as input
+        self._waveform_params = kwargs.get('waveform_params', {'window': round(.25*self.N),
+                                                    'polynom': 3})
+        # check if a specific waveform type was passed as input
+        self._waveform_type = kwargs.get('waveform_type', 'uneven_savgol')
         self._get_waveform()
 
     def _get_phased_values(self):
@@ -234,16 +255,11 @@ class FoldedLightCurve(LightCurve):
         else:
             raise ValueError("Please enter a valid _positive_ timescale")        
         
-    def _get_waveform(self, 
-                      waveform_type='uneven_savgol', 
-                      waveform_params={}):
-        self._waveform_type = waveform_type
-        self._waveform_params = waveform_params
-        self.waveform = self.wf.get_waveform(waveform_type=self._waveform_type, 
-                                             waveform_params=waveform_params)
+    def _get_waveform(self, **kwargs):
+        self.waveform = self.wf.get_waveform(waveform_type= kwargs.get('waveform_type', self._waveform_type), 
+                                             waveform_params=kwargs.get('waveform_params', self._waveform_params))
         # phasefolded lightcurves also have a residual curve between the waveform and the lightcurve
-        self.residual = self.wf.residual_magnitude(waveform_type=waveform_type,
-                                                   waveform_params=waveform_params)
+        self.residual = self.wf.residual_magnitude(self.waveform)
     
     # @property
     # def waveform_type(self):
@@ -322,7 +338,15 @@ class SyntheticLightCurve:
                     rms_noise = 0.001  
                 self.time = np.arange(0, timespan, cadence)
             elif kwargs['survey_window'] == 'TESS':
-                raise NotImplementedError
+                if bool(faint):
+                    mean_mag = 16.
+                    noise_level = 0.01
+                    rms_noise = 0.01
+                else:
+                    mean_mag = 10.
+                    noise_level = 0.0003 
+                    rms_noise = 0.0003
+                self.read_observational_window(kwargs['survey_window'])
             elif kwargs['survey_window'] == 'Rubin':
                 raise NotImplementedError
             elif kwargs['survey_window'] == 'ZTF':
@@ -411,9 +435,9 @@ class SyntheticLightCurve:
         
         self.n_epochs = len(self.time)
         self.time.setflags(write=False)  # Set the array as read-only      
-        self.err = abs(np.random.normal(loc=rms_noise, scale=noise_level, size=self.n_epochs))  
+        self.err = np.random.normal(loc=noise_level, scale=rms_noise, size=self.n_epochs) 
         self._noisy_mag = mean_mag + 1.* self.err  # np.random.normal(loc=mean_mag, scale=noise_level, size=self.n_epochs)
-        self.err = abs(np.random.normal(loc=rms_noise, scale=noise_level, size=self.n_epochs))
+        self.err = abs(self.err)
         self._noisy_mag.setflags(write=False)  # Set the array as read-only        
         self.err.setflags(write=False)  # Set the array as read-only
         #
@@ -448,8 +472,8 @@ class SyntheticLightCurve:
             'GaiaDR5': 'gaia_DR5.csv',
             'TESS': 'TESS.csv',
             'ZTF': 'ZTF.csv',
-            'ASAS-SN-V': 'ASAS-SN_V.csv',
-            'ASAS-SN-g': 'ASAS-SN_g.csv',
+            'ASAS-SN-V': 'ASASSN_V.csv',
+            'ASAS-SN-g': 'ASASSN_g.csv',
         }
         df = pd.read_csv('../data/' + \
             observational_windows_filenames[survey_window])
@@ -468,7 +492,7 @@ class SyntheticLightCurve:
             warnings.warn(f'periodic_symmetric: \n Using class default value of {self.ptp_amp}')
         if period is None:
             period = self.period
-            warnings.warn(f'periodic_symmetric: \n Using class default value of {self.ptp_amp}')            
+            warnings.warn(f'periodic_symmetric: \n Using class default value of {self.period}')            
         self.mag_ps = self._noisy_mag + 0.5 * ptp_amp * \
             np.sin(2. * np.pi * (self.time - np.min(self.time))\
                 / period + phi_0)
