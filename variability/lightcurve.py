@@ -156,24 +156,21 @@ class FoldedLightCurve(LightCurve):
         
         # makes sure this is also a LightCurve object
         if 'lc' in kwargs:
-            time = kwargs['lc'].time
-            mag = kwargs['lc'].mag
-            err = kwargs['lc'].err
+            super().__init__(kwargs['lc'].time, kwargs['lc'].mag, kwargs['lc'].err)
         elif all(key in kwargs for key in ['time', 'mag', 'err']):
-            time = kwargs['time']
-            mag = kwargs['mag']
-            err = kwargs['err']
+            super().__init__(kwargs['time'], kwargs['mag'], kwargs['err'], kwargs.get('mask', None))
         else:
             raise ValueError("Either a LightCurve object or time, mag and err arrays must be provided")
-        mask = kwargs.get('mask', None)
-        super().__init__(time, mag, err, mask=mask)
         
+        # FlodedLightCurve needs a timescale
+        if timescale is not None:
+            self._timescale = timescale
+        else:
+            raise NotImplementedError("Automatic timescale derivation not implemented, please provide timescale as input")
+
         # phasefold lightcurve to a given timescale
-        assert timescale is not None, "A timescale must be provided" #should I get a timescale automatically here?
-        self._timescale = timescale 
-        # print('FLC __init__ timescale', self._timescale)
-        self._get_phased_values()
-        
+        self._get_phased_values()        
+                
         # phasefold lightcurves have a waveform
         # define a WaveForm Object
         self.wf = WaveForm(self.phase, self.mag_phased)
@@ -186,21 +183,12 @@ class FoldedLightCurve(LightCurve):
 
     def _get_phased_values(self):
         # Calculate the phase values
-        # print('FLC _get_phased_values timescale', self._timescale)
         phase = np.mod(self.time, self._timescale) / self._timescale
         # Sort the phase and magnitude arrays based on phase values
         sort = np.argsort(phase)
         self.phase = phase[sort]
         self.mag_phased = self.mag[sort]       
         self.err_phased = self.err[sort]
-
-    def _get_waveform(self, **kwargs):
-        # print('FLC _get_waveform timescale', self._timescale)
-        self.waveform = self.wf.get_waveform(waveform_type= kwargs.get('waveform_type', self._waveform_type), 
-                                             waveform_params=kwargs.get('waveform_params', self._waveform_params))
-        # print('lc wf', np.mean(self.waveform))
-        # phasefolded lightcurves also have a residual curve between the waveform and the lightcurve
-        self.residual = self.wf.residual_magnitude(self.waveform)        
         
     @property
     def timescale(self):
@@ -209,14 +197,13 @@ class FoldedLightCurve(LightCurve):
     @timescale.setter
     def timescale(self, new_timescale):
         if new_timescale > 0.:
-            print('ts setter mag_phase before', np.mean(self.mag_phased))
             self._timescale = new_timescale
             self._get_phased_values()
-            self._get_waveform()
-            print('ts setter mag_phase now', np.mean(self.mag_phased))
-            # print('lc', np.mean(self.mag_phased))
         else:
-            raise ValueError("Please enter a valid _positive_ timescale")         
+            raise ValueError("Please enter a valid _positive_ timescale")        
         
-
-    
+    def _get_waveform(self, **kwargs):
+        self.waveform = self.wf.get_waveform(waveform_type= kwargs.get('waveform_type', self._waveform_type), 
+                                             waveform_params=kwargs.get('waveform_params', self._waveform_params))
+        # phasefolded lightcurves also have a residual curve between the waveform and the lightcurve
+        self.residual = self.wf.residual_magnitude(self.waveform)
