@@ -84,7 +84,6 @@ class VariabilityIndex:
     class Q_index:
         def __init__(self, parent, waveform_type, waveform_params):
             self.parent = parent
-            print(parent.lc.timescale)
             self._waveform_type = waveform_type
             self._waveform_params = waveform_params
 

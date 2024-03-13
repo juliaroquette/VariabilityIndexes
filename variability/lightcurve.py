@@ -153,7 +153,7 @@ class FoldedLightCurve(LightCurve):
     def __init__(self,
                  timescale=None,
                  **kwargs):
-        
+          
         # makes sure this is also a LightCurve object
         if 'lc' in kwargs:
             super().__init__(kwargs['lc'].time, kwargs['lc'].mag, kwargs['lc'].err)
