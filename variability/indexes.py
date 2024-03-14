@@ -18,12 +18,13 @@ __This currently includes__
 - VonNeumann
 - norm_ptp
 - mad
+- Q_index
+
 
 
 __ Under implementation __
 - stetsonK
 - Abbe
-- Q_index
 
 __TO DO__
 - Add documenation to each method
@@ -42,27 +43,20 @@ class VariabilityIndex:
         if not isinstance(lc, LightCurve):
             raise TypeError("lc must be an instance of LightCurve")
         self.lc = lc
-        if isinstance(lc, FoldedLightCurve):
-            self.timescale = self.lc.timescale
-        else:
-            self.timescale = kwargs.get('timescale', None)
-            # defines a folded light-curve object
-            if bool(self.timescale):
-                self.lc = FoldedLightCurve(lc=self.lc, timescale=self.timescale)
-            else:
-                warn("No timescale defined. Q_index will not be calculated")
         
+        # calculate M-index
         M_percentile = kwargs.get('M_percentile', 10.)
         M_is_flux = kwargs.get('M_is_flux', False)
-        
         self.M_index = self.M_index(parent=self,percentile=M_percentile, is_flux=M_is_flux)
 
-        Q_waveform_type = kwargs.get('waveform_type', 'uneven_savgol')
-        Q_waveform_params = kwargs.get('waveform_params', {})
-        if bool(self.timescale):
-            self.Q_index = self.Q_index(parent=self, waveform_type=Q_waveform_type, waveform_params=Q_waveform_params)
-        else:
+        # calculate Q-index
+        if not isinstance(self.lc, FoldedLightCurve):
+            warn("Q-index is only available for folded light-curves")
             self.Q_index = None
+        else:
+            Q_waveform_type = kwargs.get('waveform_type', 'uneven_savgol')
+            Q_waveform_params = kwargs.get('waveform_params', {})
+            self.Q_index = self.Q_index(parent=self, waveform_type=Q_waveform_type, waveform_params=Q_waveform_params)
 
     class M_index:
         def __init__(self, parent, percentile=10., is_flux=False):
@@ -155,9 +149,9 @@ class VariabilityIndex:
     
     @property
     def Lag1AutoCorr(self):
-        return np.sum((self.mag[:-1] - self.lc.mean) *
-                      (self.mag[1:] - self.lc.mean))/np.sum(
-                          (self.mag - self.lc.mean)**2)
+        return np.sum((self.lc.mag[:-1] - self.lc.mean) *
+                      (self.lc.mag[1:] - self.lc.mean))/np.sum(
+                          (self.lc.mag - self.lc.mean)**2)
     
     @property
     def VonNeumann(self):
@@ -220,7 +214,6 @@ class VariabilityIndex:
            
         @property
         def value(self):
-            self.parent.lc._get_waveform(waveform_type=self.waveform_type, 
-                                  waveform_params=self.waveform_params)
+            self.parent.lc._get_waveform()
             return (np.std(self.parent.lc.residual)**2 - np.mean(self.parent.lc.err_phased)**2)\
                 /(np.std(self.parent.lc.mag_phased)**2 - np.mean(self.parent.lc.err_phased)**2)
