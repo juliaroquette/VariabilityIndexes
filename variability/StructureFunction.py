@@ -92,7 +92,7 @@ def structure_function_slow(mag, time, num_bins = 100, epsilon = 0) :
 ################################################
 #Derive timescale    
     
-def find_timescale(sf, t_log, err = 0.01, thresh = 80):
+def find_timescale(sf, t_log, err = 0.01, thresh = 75):
 
     """
     Finds the characteristic timescale of a time-series from the Structure Function.
@@ -100,7 +100,7 @@ def find_timescale(sf, t_log, err = 0.01, thresh = 80):
     Args:
         - sf, t_log (ndarray): Structure function and log time bins (structure function must be in mag**2)
         - err (float):         Error threshold. Defaults to 0.01. Used to define the noise-dominated regime of the sf
-        - thresh (int):        Thresh_th percentile is used for a first approximation of tau_peak (timescale where most variability occurs)           
+        - thresh (int):        Thresh_th percentile is used for a first approximation of tau_peak (timescale where most variability occurs). Default is Q3           
 
     Returns:
         - ts_sf (float):       The characteristic timescale. For a periodic time series, should be 1/2 the period
@@ -162,13 +162,15 @@ def find_timescale(sf, t_log, err = 0.01, thresh = 80):
     t_peaks = t_log[peaks]
     sel     = np.where((t_peaks>=tau_eq))[0]
     peaks   = t_peaks[sel]
+    flag    = False
     
     if len(peaks) > 0 :
         ts_sf   = peaks[0]
     else :
         print('no ts found')
         ts_sf = np.nan
+        flag  = True
     
-    return ts_sf, dict_fit
+    return ts_sf, dict_fit, flag
 
 
