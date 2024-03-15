@@ -1,7 +1,7 @@
 **@juliaroquette** Package under development for deriving Q&M indexes (and a few other variability indexes) for any time type of light-curves.
 
 
-**Last Update**: 22 February 2024
+**Last Update**: 15 March 2024
 
 In this current version, one can import and use it by doing:
 
@@ -143,9 +143,13 @@ you are expected to pass in a `LightCurve` object, or a `FoldedLightCurve` objec
 
 
 
-### `VariabilityIndex.M_index``
+### `VariabilityIndex.M_index`
 
-### `VariabilityIndex.Q_index``
+### `VariabilityIndex.Q_index`
+
+### `gaia_AG_proxy`
+
+
 
 ## TO DO list
 - :white_large_square: **@juliaroquette** Implement the Abbe variability index into `indexes.py`

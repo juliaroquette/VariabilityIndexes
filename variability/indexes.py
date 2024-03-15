@@ -217,3 +217,25 @@ class VariabilityIndex:
             self.parent.lc._get_waveform()
             return (np.std(self.parent.lc.residual)**2 - np.mean(self.parent.lc.err_phased)**2)\
                 /(np.std(self.parent.lc.mag_phased)**2 - np.mean(self.parent.lc.err_phased)**2)
+
+def gaia_AG_proxy(phot_g_mean_flux, phot_g_mean_flux_error, phot_g_n_obs):
+    """
+    Following Mowlavi et al. 2021 (https://ui.adsabs.harvard.edu/#abs/2021A%26A...648A..44M)
+    this function calculates a proxy for the variability of Gaia sources using the uncertainty of
+    the Gaia G-band fluxes.
+    This is provided in equation (2) of the paper, and is given by:
+    
+    AG = sqrt(phot_g_n_obs)*phot_g_mean_flux_error/phot_g_mean_flux
+
+    For constant stars this is approximately the standard deviation of 
+    G light curves due to noise and uncalibrated systematic effects. 
+    _summary_
+
+    Args:
+        phot_g_mean_flux (_type_): _description_
+        phot_g_mean_flux_error (_type_): _description_
+        phot_g_n_obs (_type_): _description_
+    """
+    return np.sqrt(phot_g_n_obs)*phot_g_mean_flux_error/phot_g_mean_flux
+    
+    
