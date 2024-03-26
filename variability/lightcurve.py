@@ -57,7 +57,7 @@ class LightCurve:
         Returns:
             int: Number of data points.
         """
-        return len(self.mag)
+        return int(len(self.mag))
     
     @property
     def time_span(self):
