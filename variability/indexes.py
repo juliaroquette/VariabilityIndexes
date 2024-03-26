@@ -20,6 +20,10 @@ __This currently includes__
 - mad
 - Q_index
 
+- gaia_AG_proxy
+
+- double check against the Gaia implementation 
+
 
 
 __ Under implementation __
@@ -92,13 +96,18 @@ class VariabilityIndex:
     
     @property    
     def Abbe(self):
-        raise NotImplementedError("This hasn't been implemented yet.")
+        """
+        Calculate Abbe value as in Mowlavi 2014A%26A...568A..78M
+        https://www.aanda.org/articles/aa/full_html/2014/08/aa22648-13/aa22648-13.html
+        """
+        return self.lc.N * np.sum((self.lc.mag[1:] - self.lc.mag[:-1])**2) /\
+            2 / np.sum((self.lc.mag - self.lc.mean)**2) / (self.lc.N - 1)
 
     # this is bugged     
     # @property   
     def stetsonK(self):
         """
-        Calcula Stetson index K
+        Calculate Stetson index K
         """
         print('odl implementation has a bug')
         return None    
@@ -153,10 +162,13 @@ class VariabilityIndex:
                       (self.lc.mag[1:] - self.lc.mean))/np.sum(
                           (self.lc.mag - self.lc.mean)**2)
     
-    @property
-    def VonNeumann(self):
-        return np.sum((self.lc.mag[1:] - self.lc.mag[:-1])/(self.lc.N - 1))/np.sum((self.lc.mag - 
-                                           self.lc.mean)/(self.lc.N - 1))
+    # @property
+    # def VonNeumann(self):
+    #     """
+    #     double check against the Gaia implementation 
+    #     """
+    #     return np.sum((self.lc.mag[1:] - self.lc.mag[:-1])/(self.lc.N - 1))/np.sum((self.lc.mag - 
+    #                                        self.lc.mean)/(self.lc.N - 1))
 
     @property
     def norm_ptp(self):
@@ -214,6 +226,7 @@ class VariabilityIndex:
            
         @property
         def value(self):
+            print(self._waveform_type)
             self.parent.lc._get_waveform()
             return (np.std(self.parent.lc.residual)**2 - np.mean(self.parent.lc.err_phased)**2)\
                 /(np.std(self.parent.lc.mag_phased)**2 - np.mean(self.parent.lc.err_phased)**2)
