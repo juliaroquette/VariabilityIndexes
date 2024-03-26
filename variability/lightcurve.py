@@ -16,7 +16,8 @@ import scipy.stats as ss
 import pandas as pd
 import warnings
 np.random.seed(42)
-
+from variability.filtering import WaveForm
+ 
 class LightCurve:
     """
     Class representing a light curve.
@@ -76,7 +77,7 @@ class LightCurve:
         Returns:
             int: Number of datapoints.
         """
-        return len(self.mag)
+        return int(len(self.mag))
     
     @property
     def time_span(self):
@@ -200,7 +201,6 @@ class FoldedLightCurve(LightCurve):
     def __init__(self,
                  timescale=None,
                  **kwargs):
-        from variability.filtering import WaveForm
         
         # makes sure this is also a LightCurve object
         if 'lc' in kwargs:
@@ -215,7 +215,7 @@ class FoldedLightCurve(LightCurve):
             self._timescale = timescale
         else:
             from variability.timescales import TimeScale
-            ts = TimeScale(lc=self.lc)
+            ts = TimeScale(lc=self)
             frequency_highest_peak, power_highest_peak, FAP_highest_peak = ts.get_LSP_period(periodogram=False)
             self._timescale = 1./frequency_highest_peak
             self.timescale_FAP = FAP_highest_peak*100
@@ -251,7 +251,11 @@ class FoldedLightCurve(LightCurve):
     def timescale(self, new_timescale):
         if new_timescale > 0.:
             self._timescale = new_timescale
+            # update phase-folded values
             self._get_phased_values()
+            # update the waveform for the new timescale
+            self.wf = WaveForm(self.phase, self.mag_phased)
+            self._get_waveform()
         else:
             raise ValueError("Please enter a valid _positive_ timescale")        
         
@@ -260,23 +264,6 @@ class FoldedLightCurve(LightCurve):
                                              waveform_params=kwargs.get('waveform_params', self._waveform_params))
         # phasefolded lightcurves also have a residual curve between the waveform and the lightcurve
         self.residual = self.wf.residual_magnitude(self.waveform)
-    
-    # @property
-    # def waveform_type(self):
-        # return self._waveform_type
-
-    # @waveform_type.setter
-    # def waveform_type(self, new_method):
-        # self._waveform_type = new_method
-        # self._get_waveform()
-    
-    # @property
-    # def waveform_param(self, **kwargs):
-        # return kwargs
-    
-    # @waveform_param.setter
-    # def waveform_param(self, **kwargs):
-        # self._get_waveform(**kwargs)
 
 class SyntheticLightCurve:
     """
