@@ -28,7 +28,8 @@ class LightCurve:
                  time,
                  mag,
                  err,
-                 mask=None):
+                 mask=None,
+                  is_flux=False): 
         """
         Initializes a LightCurve object.
 
@@ -45,6 +46,8 @@ class LightCurve:
         self.time = np.asarray(time, dtype=float)[mask]
         self.mag = np.asarray(mag, dtype=float)[mask]
         self.err = np.asarray(err, dtype=float)[mask]
+        # this flag will be important if we decide to work with fluxes
+        self.is_flux = is_flux
     
     @property    
     def N(self):
