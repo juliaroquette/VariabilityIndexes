@@ -1,11 +1,13 @@
 """
 Module for computing variability timescales.
 
-@juliaroquette: At the moment only the Lomb Scargle Periodogram is implemented. 
+@juliaroquette: At the moment only the LombScargle periodogram is implemented.
 """
 
 import numpy as np
 from astropy.timeseries import LombScargle
+from scipy.signal import find_peaks
+import warnings
 
 
 class TimeScale:
@@ -13,20 +15,19 @@ class TimeScale:
         from variability.lightcurve import LightCurve
         if not isinstance(lc, LightCurve):
             raise TypeError("lc must be an instance of LightCurve")        
-        # super().__init__(time, mag, err, mask=None)
         self.lc = lc
         
     def get_LSP_period(self,
-                          fmin=1./250., 
+                          fmin=1./100., 
                           fmax=1./0.5,
-                          osf=5., 
+                          osf=10., 
                           periodogram=False, 
                           fap_prob=[0.001, 0.01, 0.1]):
         """
         Simple Period estimation code using Lomb-Scargle. 
         This adopts an heuristic approach for the frequency grid where,
         given the max/min values in the frequency, the grid is oversampled 
-        by a default value of 5.
+        by a default value of 10 (this is the recommendation for Gaia DR4).
         
 
         Args:
@@ -37,7 +38,7 @@ class TimeScale:
                 NOTE: default min and max value consider:
                         - fmax is set by a 0.5 days period, which is about 
                         the break-up speed for very young stars. 
-                        - fmin is arbitrary set to 250 days.
+                        - fmin is arbitrary set to 100 days.
             periodogram (bool, optional): if True, returns the periodogram, 
                                           otherwise returns the period.
 
@@ -49,9 +50,7 @@ class TimeScale:
         else:
             frequency of the highest peak: float
             power of the highest peak: float
-            type_flag: [1] if less than 1% of FAP - interpret as period
-                       [0] if less than 10% - interpret as timescale
-                       [-1] if more than 10% - interpret as probably spurious
+            FAP_highest_peak: 0-1. float: False Alarm Probability for the highest peak
         """
         # define the base for the Lomb-Scargle
         ls = LombScargle(self.lc.time, self.lc.mag)
@@ -67,10 +66,13 @@ class TimeScale:
             return frequency, power, FAP_level
         else:
             highest_peak = power[np.argmax(power)]
-            if highest_peak >= FAP_level[0]:
-                type_flag = 1 # see it as a periodicity
-            elif highest_peak >= FAP_level[1]:
-                type_flag = 0 # see it as a timescale
-            else:
-                type_flag = -1 # see it as probably spurious
-            return frequency[np.argmax(power)], highest_peak, type_flag
+            FAP_highest_peak = ls.false_alarm_probability(power.max(),method='baluev', 
+                                         minimum_frequency=fmin, 
+                                         maximum_frequency=fmax, 
+                                         samples_per_peak=osf)
+            return frequency[np.argmax(power)], highest_peak, FAP_highest_peak
+
+    def get_structure_function_timescale(self):
+        raise NotImplementedError("This hasn't been implemented yet.")
+
+    
