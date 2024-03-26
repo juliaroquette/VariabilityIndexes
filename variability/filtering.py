@@ -27,11 +27,11 @@ class Filtering:
         Parameters:
         - method (str): The filtering method to be applied. Available options are:
             - 'savgol': Apply the Savitzky-Golay filter to remove long-term trends.
-                - **kargs:
+                - **kwargs:
                     - timescale (int): The length of the filter window.
                     - polynom (int): The order of the polynomial used to fit the samples.
             - 'Cody': Apply the Cody filter to remove long-term trends.
-                - **kargs:
+                - **kwargs:
                     - window_length (int): The length of the filter window.
                     - polyorder (int): The order of the polynomial used to fit the samples.
             - 'rolling_average': Apply the rolling average filter to remove long-term trends.
@@ -258,14 +258,14 @@ class WaveForm:
     
     def get_waveform(self, waveform_type='uneven_savgol', waveform_params={}):
         if waveform_type == 'savgol':
-            window = waveform_params.get('window', 10.)
+            window = waveform_params.get('window', 25.)
             polynom = waveform_params.get('polynom', 3)
             waveform = self.savgol(window=window, polynom=polynom)
         elif waveform_type == 'Cody':
             n_point = waveform_params.get('n_point',50)
             waveform = self.waveform_Cody(n_point=n_point)
         elif waveform_type == 'circular_rolling_average_phase':
-            wd_phase = waveform_params.get('wd_phase', 0.1)
+            wd_phase = waveform_params.get('wd_phase', 0.25)
             waveform = self.circular_rolling_average_phase(wd_phase=wd_phase)
         elif waveform_type == 'circular_rolling_average_number':
             window_size = waveform_params.get('window_size', 0.1*self.N)
@@ -274,21 +274,22 @@ class WaveForm:
             kernel = waveform_params.get('kernel', 4.)
             waveform = self.waveform_H22(kernel=kernel)
         elif waveform_type == 'uneven_savgol':
-            window = waveform_params.get('window', round(0.1*self.N))
+            window = waveform_params.get('window', round(0.25*self.N))
             if window % 2 == 0:
                 window += 1
             polynom = waveform_params.get('polynom', 3)
+            while polynom >= window:
+                window += 2
             waveform = self.uneven_savgol(window, polynom)
         else:
-            raise ValueError("Method _{0}_ not implemented.".format(self._waveform_type))
+            raise ValueError("Method _{0}_ not implemented.".format(waveform_type))
         return waveform
     
-    def residual_magnitude(self, waveform_type='uneven_savgol', waveform_params={}):
+    def residual_magnitude(self, waveform):
         """
         Calculate the residual magnitude after waveform subtraction.
         """
-        return self.mag_phased - self.get_waveform(waveform_type=waveform_type,
-                                                   waveform_params=waveform_params)
+        return self.mag_phased - waveform
 
 def uneven_savgol_(x, y, window, polynom):
     """
