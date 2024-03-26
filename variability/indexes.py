@@ -25,14 +25,12 @@ class VariabilityIndex:
 
         # calculate Q-index
         if not isinstance(self.lc, FoldedLightCurve):
-            warnings.warn("Q-index is only available for folded light-curves")
+            warn("Q-index is only available for folded light-curves")
             self.Q_index = None
         else:
             Q_waveform_type = kwargs.get('waveform_type', 'uneven_savgol')
             Q_waveform_params = kwargs.get('waveform_params', {})
             self.Q_index = self.Q_index(parent=self, waveform_type=Q_waveform_type, waveform_params=Q_waveform_params)
-        if 'timescale' in kwargs:
-            warnings.warn('timescale is not a valid parameter for VariabilityIndex - please use the timescale attribute of the light curve object instead')
 
     class M_index:
         def __init__(self, parent, percentile=10., is_flux=False):
@@ -66,44 +64,30 @@ class VariabilityIndex:
         def value(self):
             return (1 - 2*int(self.is_flux))*(np.mean(self.parent.lc.mag[self.get_percentile_mask]) - self.parent.lc.median)/self.parent.lc.std
             
-    @property
-    def timescale(self):
-        return self._timescale
-    
-    @timescale.setter
-    def timescale(self, new_timescale):
-        self._timescale = new_timescale
-        if isinstance(self.lc, FoldedLightCurve):
-            self.lc.timescale = new_timescale
-            # Recalculate Q_index
-            self.lc._get_waveform
-            # self.Q_index.parent = self.parent.lc._get_waveform(waveform_type=self.waveform_type, 
-                                #   waveform_params=self.waveform_params)
-            # self.Q_index.value = self.Q_index.value()
-    
     class Q_index:
         def __init__(self, parent, waveform_type, waveform_params):
             self.parent = parent
             self._waveform_type = waveform_type
             self._waveform_params = waveform_params
-
+            
         @property
         def waveform_type(self):
             """ 
             Waveform estimator method used to calculate the Q-index 
             """
             return self._waveform_type
-            
+	
         @waveform_type.setter
         def waveform_type(self, new_waveform_type):
-            implemented_waveform_types = ['circular_rolling_average_phase',
+            implemented_waveform_types = ['savgol', 'Cody',
+                                     'circular_rolling_average_phase',
                                      'circular_rolling_average_number',
-                                     'uneven_savgol']
+                                     'H22', 'uneven_savgol']
             if new_waveform_type in implemented_waveform_types:
                 self._waveform_type = new_waveform_type
             else:
                 raise ValueError("Please enter a valid waveform type {0}".format(implemented_waveform_types))
-        
+            
         @property
         def waveform_params(self):
             """ 
@@ -114,13 +98,10 @@ class VariabilityIndex:
         @waveform_params.setter
         def waveform_params(self, new_waveform_params):
             self._waveform_params = new_waveform_params
-            
-        @property
-        def residual(self):
-            self.parent.lc._get_waveform()
-            return self.parent.lc.residual
            
         @property
         def value(self):
-            return (np.std(self.residual)**2 - np.mean(self.parent.lc.err_phased)**2)\
+            print(self._waveform_type)
+            self.parent.lc._get_waveform()
+            return (np.std(self.parent.lc.residual)**2 - np.mean(self.parent.lc.err_phased)**2)\
                 /(np.std(self.parent.lc.mag_phased)**2 - np.mean(self.parent.lc.err_phased)**2)
