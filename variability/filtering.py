@@ -194,7 +194,7 @@ class WaveForm:
 
     def get_waveform(self, waveform_type='uneven_savgol', waveform_params={}):
         if waveform_type == 'circular_rolling_average_phase':
-            wd_phase = waveform_params.get('wd_phase', 0.1)
+            wd_phase = waveform_params.get('wd_phase', 0.25)
             waveform = self.circular_rolling_average_phase(wd_phase=wd_phase)
         elif waveform_type == 'circular_rolling_average_number':
             window_size = waveform_params.get('window_size', 0.1*self.N)
@@ -204,6 +204,8 @@ class WaveForm:
             if window % 2 == 0:
                 window += 1
             polynom = waveform_params.get('polynom', 3)
+            while polynom >= window:
+                window += 2
             waveform = self.uneven_savgol(window, polynom)
         else:
             raise ValueError("Method _{0}_ not implemented.".format(self._waveform_type))
