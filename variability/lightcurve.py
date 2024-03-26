@@ -156,7 +156,7 @@ class FoldedLightCurve(LightCurve):
     def __init__(self,
                  timescale=None,
                  **kwargs):
-          
+        
         # makes sure this is also a LightCurve object
         if 'lc' in kwargs:
             super().__init__(kwargs['lc'].time, kwargs['lc'].mag, kwargs['lc'].err)
@@ -169,7 +169,13 @@ class FoldedLightCurve(LightCurve):
         if timescale is not None:
             self._timescale = timescale
         else:
-            raise NotImplementedError("Automatic timescale derivation not implemented, please provide timescale as input")
+            # raise NotImplementedError("Automatic timescale derivation not implemented, please provide timescale as input")
+            from variability.timescales import TimeScale
+            ts = TimeScale(lc=self)
+            frequency_highest_peak, power_highest_peak, FAP_highest_peak = ts.get_LSP_period(periodogram=False)
+            self._timescale = 1./frequency_highest_peak
+            self.timescale_FAP = FAP_highest_peak*100
+            warnings.warn("Automatic timescale estimated from LSP - FAP: {0}".format(self.timescale_FAP))
 
         # phasefold lightcurve to a given timescale
         self._get_phased_values()        
