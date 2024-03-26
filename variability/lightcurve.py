@@ -185,7 +185,7 @@ class FoldedLightCurve(LightCurve):
         self.wf = WaveForm(self.phase, self.mag_phased)
         #  check if specific window parameters were passed as input
         self._waveform_params = kwargs.get('waveform_params', {'window': round(.25*self.N),
-                                                    'polynom': 3})
+                                                    'polynom': 1})
         # check if a specific waveform type was passed as input
         self._waveform_type = kwargs.get('waveform_type', 'uneven_savgol')
         self._get_waveform()

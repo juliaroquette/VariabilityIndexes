@@ -54,11 +54,13 @@ class TimeScale:
         """
         # define the base for the Lomb-Scargle
         ls = LombScargle(self.lc.time, self.lc.mag)
-        frequency, power = ls.autopower(samples_per_peak=osf,
+        frequency, power = ls.autopower(method='slow', #should be similar to the VariPipe
+                                        samples_per_peak=osf,
                                         minimum_frequency=fmin,
                                         maximum_frequency=fmax) 
         # get False alarm probability levels
-        FAP_level = ls.false_alarm_level(fap_prob, method='baluev', 
+        FAP_level = ls.false_alarm_level(fap_prob, 
+                                         method='baluev', #same method in VariPipe
                                          minimum_frequency=fmin, 
                                          maximum_frequency=fmax, 
                                          samples_per_peak=osf)
@@ -66,7 +68,8 @@ class TimeScale:
             return frequency, power, FAP_level
         else:
             highest_peak = power[np.argmax(power)]
-            FAP_highest_peak = ls.false_alarm_probability(power.max(),method='baluev', 
+            FAP_highest_peak = ls.false_alarm_probability(power.max(),
+                                                          method='baluev', 
                                          minimum_frequency=fmin, 
                                          maximum_frequency=fmax, 
                                          samples_per_peak=osf)
