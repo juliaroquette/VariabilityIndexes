@@ -7,20 +7,20 @@ import numpy as np
 import scipy as sp
 import pandas as pd
 from astropy.convolution import Box1DKernel, convolve
-from variability.lightcurve import LightCurve, FoldedLightCurve
 
-
-class Filtering(LightCurve):
+class Filtering:
     def __init__(self, lc):
-        # if not isinstance(lc, LightCurve):
-            # raise TypeError("lc must be an instance of LightCurve")
-        # self.lc = lc
-        super().__init__(lc.time, lc.mag, lc.err)
+        from variability.lightcurve import LightCurve
+        if isinstance(lc, LightCurve):
+            self.lc = lc
+        else:
+            raise TypeError("lc must be an instance of LightCurve")
+        
         self.even = self.is_evenly_spaced()
         if not self.even:
             warnings.warn("Time series may not be evenly spaced.", UserWarning)
 
-    def filter(self, method=None, **kargs):
+    def filter(self, method=None, **kwargs):
         """
         Apply a filter of choice to detrend light-curve.
 
@@ -35,15 +35,15 @@ class Filtering(LightCurve):
                     - window_length (int): The length of the filter window.
                     - polyorder (int): The order of the polynomial used to fit the samples.
             - 'rolling_average': Apply the rolling average filter to remove long-term trends.
-                - **kargs:
+                - **kwargs:
                     - window_size (int): The size of the moving window.
             - 'uneven_savgol': Apply the uneven Savitzky-Golay filter to remove long-term trends.
-                - **kargs:
+                - **kwargs:
                     - breakpoints (list): A list of breakpoints where the filter window changes.
                     - window_length (int): The length of the filter window for each segment.
                     - polyorder (int): The order of the polynomial used to fit the samples for each segment.
             - 'smooth_per_timescale': Apply the smooth per timescale filter to remove long-term trends.
-                - **kargs:
+                - **kwargs:
                     - timescale (float): The timescale parameter for the filter.
 
         Returns:
@@ -53,15 +53,15 @@ class Filtering(LightCurve):
         - ValueError: If the specified filtering method is not implemented.
         """
         if method == 'savgol':
-            return self.savgol_longtrend(**kargs)
+            return self.savgol_longtrend(**kwargs)
         elif method == 'Cody':
-            return self.Cody_long_trend(**kargs)
+            return self.Cody_long_trend(**kwargs)
         elif method == 'rolling_average':
-            return self.rolling_average(**kargs)
+            return self.rolling_average(**kwargs)
         elif method == 'uneven_savgol':
-            return self.uneven_savgol(**kargs)
+            return self.uneven_savgol(**kwargs)
         elif method == 'smooth_per_timescale':
-            return self.smooth_per_timescale(**kargs)
+            return self.smooth_per_timescale(**kwargs)
         else:
             raise ValueError("Method _{0}_ not implemented.".format(method))
     
@@ -70,9 +70,9 @@ class Filtering(LightCurve):
         tests if a function is close to evenly spaced.
         The default tolerance check if less than 0.01% of t
         """
-        dt = self.time[1:] - self.time[:-1]
+        dt = self.lc.time[1:] - self.lc.time[:-1]
         num_outliers = len(np.where(abs(dt - np.mean(dt)) > 3*np.std(dt))[0])
-        return bool(num_outliers < (tolerance/100.)*len(self.time))
+        return bool(num_outliers < (tolerance/100.)*len(self.lc.time))
 
     #masking
     def sigma_clip(self, sigma=5):
@@ -80,7 +80,7 @@ class Filtering(LightCurve):
         remove outliers from the light-curve using a sigma clipping
         returns as mask for values to be kept after filtering
         """
-        return np.abs(self.mag - self.median) <= sigma * self.std
+        return np.abs(self.lc.mag - self.lc.median) <= sigma * self.lc.std
 
     def get_num_time(self, timescale=10.):
         """
@@ -90,7 +90,7 @@ class Filtering(LightCurve):
         """
         if not self.even:
             warnings.warn("Time series may not be evenly spaced - no direct conversion between number of points and timescale.", UserWarning)
-        time = self.time - np.min(self.time)
+        time = self.lc.time - np.min(self.lc.time)
         return len(time[time < timescale])
     
     #detrending
@@ -101,7 +101,7 @@ class Filtering(LightCurve):
         Source:
         """
         window = self.get_num_time(timescale)
-        return scipy.ndimage.median_filter(self.mag, size=window, mode='nearest')
+        return scipy.ndimage.median_filter(self.lc.mag, size=window, mode='nearest')
     
         
     def savgol_longtrend(self, timescale=10., polynom=3) :
@@ -111,11 +111,11 @@ class Filtering(LightCurve):
         if not self.even:
             warnings.warn("SavGol Scipy expects even time series - which may not be true here.", UserWarning)        
         window = self.get_num_time(timescale)
-        return sp.signal.savgol_filter(self.mag, window, polynom)
+        return sp.signal.savgol_filter(self.lc.mag, window, polynom)
     
     def uneven_savgol(self, window, polynom):
-        x = self.time
-        y = self.mag
+        x = self.lc.time
+        y = self.lc.mag
         return uneven_savgol(x, y, window, polynom)
     
     def smooth_per_timescale(self, window_days=10.):
@@ -124,12 +124,12 @@ class Filtering(LightCurve):
         use a window wd in days to smooth the light-curve
         then remove the smoothed curve form the 
         """
-        smoothed_values = np.zeros_like(self.mag, dtype=float)
-        for i in range(len(self.time)):
-            start_time = self.time[i] - window_days/2
-            end_time = self.time[i] + window_days/2
-            select = np.where((self.time >= start_time) & (self.time <= end_time))
-            smoothed_values[i] = np.mean(self.mag[select])
+        smoothed_values = np.zeros_like(self.lc.mag, dtype=float)
+        for i in range(len(self.lc.time)):
+            start_time = self.lc.time[i] - window_days/2
+            end_time = self.lc.time[i] + window_days/2
+            select = np.where((self.lc.time >= start_time) & (self.lc.time <= end_time))
+            smoothed_values[i] = np.mean(self.lc.mag[select])
         return smoothed_values
 
     def rolling_average(self, window=5):
@@ -138,20 +138,22 @@ class Filtering(LightCurve):
         """
         if not self.even:
             warnings.warn("Using window size in datapoints number for uneven data.", UserWarning)                
-        return pd.Series(self.mag).rolling(window, min_periods=window, win_type='boxcar', center=True, closed='neither').mean().to_numpy()
+        return pd.Series(self.lc.mag).rolling(window, min_periods=window, win_type='boxcar', center=True, closed='neither').mean().to_numpy()
     
     def apply_filter(self, mask):
         """
         applies a mask generated by a filter into a light curve
         """
-        self.time = np.asarray(self.time, dtype=float)[mask]
-        self.mag = np.asarray(self.mag, dtype=float)[mask]
-        self.err = np.asarray(self.err, dtype=float)[mask]
+        from variability.lightcurve import FoldedLightCurve
+        self.lc.time = np.asarray(self.lc.time, dtype=float)[mask]
+        self.lc.mag = np.asarray(self.lc.mag, dtype=float)[mask]
+        self.lc.err = np.asarray(self.lc.err, dtype=float)[mask]
         if isinstance(self, FoldedLightCurve):
             # if the light curve is folded, we need to update the phase
-            self._get_phased_values()
-            self.wf = WaveForm(self.phase, self.mag_phased)
-            self._get_waveform()
+            self.lc._get_phased_values()
+            self.lc.wf = WaveForm(self.lc.phase, self.lc.mag_phased)
+            self.lc._get_waveform()
+        return self.lc
         
 
 
