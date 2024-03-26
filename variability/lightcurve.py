@@ -69,6 +69,7 @@ class LightCurve:
         self.mag = np.asarray(mag, dtype=float)[mask]
         self.err = np.asarray(err, dtype=float)[mask]
         self.is_flux = is_flux
+
     @property    
     def N(self):
         """
@@ -192,7 +193,15 @@ class LightCurve:
         tail = round(0.05 * self.N)
         return  np.median(np.sort(self.mag)[-tail:]) - np.median(np.sort(self.mag)[:tail])
         
-      
+    @property
+    def range(self):
+        """
+        Returns the range of the magnitude values.
+
+        Returns:
+            float: Range value.
+        """
+        return self.mag.max() - self.mag.min()
 
 class FoldedLightCurve(LightCurve):
     """
@@ -229,7 +238,7 @@ class FoldedLightCurve(LightCurve):
         self.wf = WaveForm(self.phase, self.mag_phased)
         #  check if specific window parameters were passed as input
         self._waveform_params = kwargs.get('waveform_params', {'window': round(.25*self.N),
-                                                    'polynom': 3})
+                                                    'polynom': 1})
         # check if a specific waveform type was passed as input
         self._waveform_type = kwargs.get('waveform_type', 'uneven_savgol')
         self._get_waveform()
