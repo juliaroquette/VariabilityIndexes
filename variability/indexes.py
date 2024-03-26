@@ -101,7 +101,6 @@ class VariabilityIndex:
            
         @property
         def value(self):
-            print(self._waveform_type)
             self.parent.lc._get_waveform()
             return (np.std(self.parent.lc.residual)**2 - np.mean(self.parent.lc.err_phased)**2)\
                 /(np.std(self.parent.lc.mag_phased)**2 - np.mean(self.parent.lc.err_phased)**2)
