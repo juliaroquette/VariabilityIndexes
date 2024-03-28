@@ -53,73 +53,79 @@ public class FoldedLightCurve extends LightCurve {
 	private double[] waveFormRes;
 	private double[] residual;
 	private Integer lastWindowSize; // Store the last used window size
-    private Integer lastPolynomOrder; // Store the last used polynomial order
-	
-	/**
-     * General constructor that can handle all input variations.
-     * 
-     * @param time      The time values of the observations.
-     * @param mag       The magnitude values of the observations.
-     * @param err       The error values of the observations.
-     * @param timescale The folding timescale.
-     * @param mask      A boolean mask for the observations (optional).
-     * @param window    The window size for the Savitzky-Golay filter (optional).
-     * @param polynom   The polynomial order for the Savitzky-Golay filter (optional).
-     */
-    public FoldedLightCurve(double[] time, double[] mag, double[] err, Double timescale, boolean[] mask, Integer window, Integer polynom) {
-        super(time, mag, err, mask);
-        
-        if (timescale == null) {
-        	// TODO: create constructors and functions for lsp
-            LombScarglePeriodogram lsp = new LombScarglePeriodogram();
-            this.timescale = 1.0 / lsp.getFrequencyOfHighestPeak();
-            this.timescaleFAP = lsp.getFalseAlarmProbability() * 100;
-        } else {
-            this.timescale = timescale;
-        }
-        calculatePhaseAndSort();
-        initializeWaveForm(window, polynom);
-    }
-	
-    /**
-     * Constructs a FoldedLightCurve object directly from arrays of time, magnitude,
-     * and error values, along with a specified timescale and mask, without specifying
-     * parameters for the Savitzky-Golay filter.
-     * 
-     * @param time      Array of time values.
-     * @param mag       Array of magnitude values.
-     * @param err       Array of error values.
-     * @param timescale The timescale used for folding the light curve.
-     * @param mask      An optional boolean array to filter data points.
-     */
-    public FoldedLightCurve(double[] time, double[] mag, double[] err, Double timescale, boolean[] mask) {
-    	// Passing null for window and polynom, using default values in initializeWaveForm
-        this(time, mag, err, timescale, mask, null, null);
-    }
+	private Integer lastPolynomOrder; // Store the last used polynomial order
 
-    /**
-     * Constructs a FoldedLightCurve object from an existing LightCurve object and a
-     * specified timescale, without specifying parameters for the Savitzky-Golay filter.
-     * 
-     * @param lc        The LightCurve object to fold.
-     * @param timescale The timescale used for folding the light curve.
-     */
-    public FoldedLightCurve(LightCurve lc, double timescale) {
-        this(lc.getTime(), lc.getMag(), lc.getErr(), timescale, lc.getMask(), null, null); // Passing null for window and polynom
-    }
-    
-    /**
-     * Constructs a FoldedLightCurve object from an existing LightCurve object and with
-     * specified timescale and parameters for the Savitzky-Golay filter.
-     * 
-     * @param lc        A LightCurve object.
-     * @param timescale The folding timescale.
-     * @param window    The window size for the Savitzky-Golay filter (optional).
-     * @param polynom   The polynomial order for the Savitzky-Golay filter (optional).
-     */
-    public FoldedLightCurve(LightCurve lc, double timescale, Integer window, Integer polynom) {
-        this(lc.getTime(), lc.getMag(), lc.getErr(), timescale, lc.getMask(), window, polynom);
-    }
+	/**
+	 * General constructor that can handle all input variations.
+	 * 
+	 * @param time      The time values of the observations.
+	 * @param mag       The magnitude values of the observations.
+	 * @param err       The error values of the observations.
+	 * @param timescale The folding timescale.
+	 * @param mask      A boolean mask for the observations (optional).
+	 * @param window    The window size for the Savitzky-Golay filter (optional).
+	 * @param polynom   The polynomial order for the Savitzky-Golay filter
+	 *                  (optional).
+	 */
+	public FoldedLightCurve(double[] time, double[] mag, double[] err, Double timescale, boolean[] mask, Integer window,
+			Integer polynom) {
+		super(time, mag, err, mask);
+
+		if (timescale == null) {
+			// TODO: create constructors and functions for lsp
+			LombScarglePeriodogram lsp = new LombScarglePeriodogram();
+			this.timescale = 1.0 / lsp.getFrequencyOfHighestPeak();
+			this.timescaleFAP = lsp.getFalseAlarmProbability() * 100;
+		} else {
+			this.timescale = timescale;
+		}
+		calculatePhaseAndSort();
+		initializeWaveForm(window, polynom);
+	}
+
+	/**
+	 * Constructs a FoldedLightCurve object directly from arrays of time, magnitude,
+	 * and error values, along with a specified timescale and mask, without
+	 * specifying parameters for the Savitzky-Golay filter.
+	 * 
+	 * @param time      Array of time values.
+	 * @param mag       Array of magnitude values.
+	 * @param err       Array of error values.
+	 * @param timescale The timescale used for folding the light curve.
+	 * @param mask      An optional boolean array to filter data points.
+	 */
+	public FoldedLightCurve(double[] time, double[] mag, double[] err, Double timescale, boolean[] mask) {
+		// Passing null for window and polynom, using default values in
+		// initializeWaveForm
+		this(time, mag, err, timescale, mask, null, null);
+	}
+
+	/**
+	 * Constructs a FoldedLightCurve object from an existing LightCurve object and a
+	 * specified timescale, without specifying parameters for the Savitzky-Golay
+	 * filter.
+	 * 
+	 * @param lc        The LightCurve object to fold.
+	 * @param timescale The timescale used for folding the light curve.
+	 */
+	public FoldedLightCurve(LightCurve lc, double timescale) {
+		// Passing null for window and polynom
+		this(lc.getTime(), lc.getMag(), lc.getErr(), timescale, lc.getMask(), null, null); 
+	}
+
+	/**
+	 * Constructs a FoldedLightCurve object from an existing LightCurve object and
+	 * with specified timescale and parameters for the Savitzky-Golay filter.
+	 * 
+	 * @param lc        A LightCurve object.
+	 * @param timescale The folding timescale.
+	 * @param window    The window size for the Savitzky-Golay filter (optional).
+	 * @param polynom   The polynomial order for the Savitzky-Golay filter
+	 *                  (optional).
+	 */
+	public FoldedLightCurve(LightCurve lc, double timescale, Integer window, Integer polynom) {
+		this(lc.getTime(), lc.getMag(), lc.getErr(), timescale, lc.getMask(), window, polynom);
+	}
 
 	/**
 	 * Calculates the phase for each observation in the light curve based on the
@@ -152,39 +158,42 @@ public class FoldedLightCurve extends LightCurve {
 		this.magPhased = sortedMag;
 		this.errPhased = sortedErr;
 	}
-	
+
 	/**
-     * Initializes the waveform with the given parameters or defaults if not provided.
-     * 
-     * @param window  The window size for Savitzky-Golay filter.
-     * @param polynom The polynomial order for Savitzky-Golay filter.
-     */
+	 * Initializes the waveform with the given parameters or defaults if not
+	 * provided.
+	 * 
+	 * @param window  The window size for Savitzky-Golay filter.
+	 * @param polynom The polynomial order for Savitzky-Golay filter.
+	 */
 	private void initializeWaveForm(Integer window, Integer polynom) {
 		this.waveForm = new WaveForm(phase, magPhased, "uneven_savgol");
-		
+
 		// Use default parameters if not provided
 		int windowSize = (window != null) ? window : Math.round(0.25f * this.magPhased.length);
-        if (windowSize % 2 == 0) windowSize += 1; // Ensure window size is odd
-        int polynomOrder = (polynom != null) ? polynom : 3;
-        
-        // Store the used parameters for future updates
-        lastWindowSize = windowSize;
-        lastPolynomOrder = polynomOrder;
-        
-        this.waveFormRes = this.waveForm.unevenSavgol(windowSize, polynomOrder);
-        this.residual = this.waveForm.residualMagnitude(windowSize, polynomOrder);
+		if (windowSize % 2 == 0)
+			windowSize += 1; // Ensure window size is odd
+		int polynomOrder = (polynom != null) ? polynom : 3;
+
+		// Store the used parameters for future updates
+		lastWindowSize = windowSize;
+		lastPolynomOrder = polynomOrder;
+
+		this.waveFormRes = this.waveForm.unevenSavgol(windowSize, polynomOrder);
+		this.residual = this.waveForm.residualMagnitude(windowSize, polynomOrder);
 	}
-	
+
 	/**
-     * Sets a new timescale and updates the phase and sort along with the waveform using the last used parameters.
-     * 
-     * @param timescale The new timescale to set.
-     */
+	 * Sets a new timescale and updates the phase and sort along with the waveform
+	 * using the last used parameters.
+	 * 
+	 * @param timescale The new timescale to set.
+	 */
 	public void setTimescale(double timescale) {
 		this.timescale = timescale;
-        // Recalculate phase and sort and waveform if timescale is changed
-        calculatePhaseAndSort();
-        // Use last used parameters for Savitzky-Golay filter
-        initializeWaveForm(lastWindowSize, lastPolynomOrder);
+		// Recalculate phase and sort and waveform if timescale is changed
+		calculatePhaseAndSort();
+		// Use last used parameters for Savitzky-Golay filter
+		initializeWaveForm(lastWindowSize, lastPolynomOrder);
 	}
 }

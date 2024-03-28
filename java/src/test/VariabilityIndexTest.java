@@ -31,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import source.LightCurve;
+import source.FoldedLightCurve;
 import source.VariabilityIndex;
 
 /**
@@ -44,6 +45,7 @@ import source.VariabilityIndex;
 
 public class VariabilityIndexTest {
 	private LightCurve lc;
+	private FoldedLightCurve flc;
 	private VariabilityIndex vi;
 	private final double delta = 1e-14;
 	final double percentile = 10.0;
@@ -72,7 +74,8 @@ public class VariabilityIndexTest {
 		}
 
 		lc = new LightCurve(time, mag, err, mask);
-		vi = new VariabilityIndex(lc, percentile, isFlux, period, waveformMethod);
+		flc = new FoldedLightCurve(lc, period);
+		vi = new VariabilityIndex(flc, percentile, isFlux);
 
 	}
 
@@ -91,29 +94,31 @@ public class VariabilityIndexTest {
 	@Test
 	public void testMIndexWithInvalidPercentile() {
 		assertThrows(IllegalArgumentException.class, () -> {
-			new VariabilityIndex(lc, 50.0, isFlux, period, waveformMethod);
+			new VariabilityIndex(lc, 50.0, isFlux);
 		}, "Expected to throw IllegalArgumentException for invalid percentile.");
 	}
-	
+
 	/**
-     * Tests the calculation of the Q-index using a predefined light curve and specified parameters.
-     */
+	 * Tests the calculation of the Q-index using a predefined light curve and
+	 * specified parameters.
+	 */
 	@Test
 	public void testQIndexCalculation() {
-		double expectedQIndex = 2.3432907958137302e-09;
+		double expectedQIndex = 1.820368224758704e-06;
 		assertEquals(expectedQIndex, vi.getQIndex().getValue(), delta, "The Q-index calculation is incorrect.");
 	}
-	
+
 	/**
-     * Tests the calculation of the Q-index with a different timescale to verify the impact on the result.
-     */
+	 * Tests the calculation of the Q-index with a different timescale to verify the
+	 * impact on the result.
+	 */
 	@Test
 	public void testQIndexWithDifferentTimescale() {
 		// Adjusting timescale for QIndex calculation
-		double newTimescale = 15.0;
-		VariabilityIndex viWithNewTimescale = new VariabilityIndex(lc, percentile, isFlux, newTimescale,
-				waveformMethod);
-		double expectedQIndex = 1.2833768638272811;
+		double newTimescale = 3.14;
+		flc.setTimescale(newTimescale);
+		VariabilityIndex viWithNewTimescale = new VariabilityIndex(flc, percentile, isFlux);
+		double expectedQIndex = 0.9077099815154741;
 		assertEquals(expectedQIndex, viWithNewTimescale.getQIndex().getValue(), delta,
 				"The Q-index calculation with a timescale of 15 is incorrect.");
 	}
