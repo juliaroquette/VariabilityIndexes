@@ -202,6 +202,16 @@ class LightCurve:
             float: Range value.
         """
         return self.mag.max() - self.mag.min()
+    
+    @property
+    def SNR(self):
+        """
+        Returns the signal-to-noise ratio of the light curve.
+
+        Returns:
+            float: Signal-to-noise ratio.
+        """
+        return np.sqrt(np.sum((self.mag - self.mean)**2)/np.sum(self.err**2))
 
 class FoldedLightCurve(LightCurve):
     """
@@ -584,7 +594,14 @@ class SyntheticLightCurve:
         ptp_A = self.random_walk_1D(len(self.time), ptp_amp)
         self.mag_AATau[dip_in] -= abs(ptp_A[dip_in]) * np.sin(phi_)
     
-    
+    def resample_from_lc(t_in, y_in, t_out):
+        """
+        Simple function for resampling a light-curve to a new time array.
+        """
+        #include tests for when t_out is outside the range of t_in
+        
+        return np.interp(t_out, t_in, y_in)
+
     # def quasiperiodic_dipper(self, 
     #                          ptp_amp, 
     #                          amp_std, 
