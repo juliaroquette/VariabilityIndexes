@@ -25,6 +25,8 @@
 
 package source;
 
+import java.util.Arrays;
+
 /**
  *
  * Implements the WaveForm class for analyzing the waveform of a folded light
@@ -37,24 +39,52 @@ package source;
  */
 
 public class WaveForm {
-	private FoldedLightCurve lc;
 	private String waveformType;
+	private double[] phase;
+	private double[] magPhased;
+	private int N;
 
 	/**
-	 * Initialize the WaveForm class.
+	 * Initialize the WaveForm class using a FoldedLightCurve object.
 	 *
 	 * @param foldedLc     The folded light curve to be analyzed.
 	 * @param waveformType The waveform analysis method to be used.
-	 * @throws IllegalArgumentException If foldedLc is not an instance of
-	 *                                  FoldedLightCurve.
+	 * @throws IllegalArgumentException If the FoldedLightCurve object is null.
 	 */
 	public WaveForm(FoldedLightCurve foldedLc, String waveformType) {
-		if (!(foldedLc instanceof FoldedLightCurve)) {
-			throw new IllegalArgumentException("lc must be an instance of FoldedLightCurve");
+		if (foldedLc == null) {
+			throw new IllegalArgumentException("FoldedLightCurve cannot be null");
 		}
 
-		this.lc = foldedLc;
 		this.waveformType = waveformType;
+		this.phase = foldedLc.getPhase();
+		this.magPhased = foldedLc.getMagPhased();
+		this.N = this.magPhased.length;
+	}
+
+	/**
+	 * Initialize the WaveForm class using phase and magnitude arrays directly.
+	 *
+	 * @param phase        The phase array of the folded light curve.
+	 * @param magPhased    The magnitude array of the folded light curve
+	 *                     corresponding to the phases.
+	 * @param waveformType The waveform analysis method to be used.
+	 * @throws IllegalArgumentException If either the phase or magPhased array is
+	 *                                  null, or if they have different lengths.
+	 */
+
+	public WaveForm(double[] phase, double[] magPhased, String waveformType) {
+		if (phase == null || magPhased == null) {
+			throw new IllegalArgumentException("Phase and magPhased arrays cannot be null");
+		}
+		if (phase.length != magPhased.length) {
+			throw new IllegalArgumentException("Phase and magPhased arrays must have the same length");
+		}
+
+		this.waveformType = waveformType;
+		this.phase = Arrays.copyOf(phase, phase.length);
+		this.magPhased = Arrays.copyOf(magPhased, magPhased.length);
+		this.N = this.magPhased.length;
 	}
 
 	/**
@@ -68,29 +98,26 @@ public class WaveForm {
 	 * @return The smoothed folded light curve.
 	 */
 	public double[] unevenSavgol(int window, int polynom) {
-		double[] phase = lc.getPhase();
-		double[] magPhased = lc.getMagPhased();
-		int N = lc.getN();
-
-		double[] x = new double[3 * N];
-		double[] y = new double[3 * N];
+		// Preparation for Savitzky-Golay filter
+		double[] x = new double[3 * this.N];
+		double[] y = new double[3 * this.N];
 
 		// Concatenate phase and magPhased for -1, 0, +1 phases
-		for (int i = 0; i < N; i++) {
-			x[i] = phase[i] - 1;
-			x[i + N] = phase[i];
-			x[i + 2 * N] = phase[i] + 1;
+		for (int i = 0; i < this.N; i++) {
+			x[i] = this.phase[i] - 1;
+			x[i + this.N] = this.phase[i];
+			x[i + 2 * this.N] = this.phase[i] + 1;
 
-			y[i] = magPhased[i];
-			y[i + N] = magPhased[i];
-			y[i + 2 * N] = magPhased[i];
+			y[i] = this.magPhased[i];
+			y[i + this.N] = this.magPhased[i];
+			y[i + 2 * this.N] = this.magPhased[i];
 		}
 
 		// Apply the Savitzky-Golay filter
 		double[] smoothedResults = SavitzkyGolayFilter.unevenSavgol(x, y, window, polynom);
-		double[] resultArray = new double[phase.length];
+		double[] resultArray = new double[this.N];
 		// Extract the filtered results corresponding to the original phase array
-		System.arraycopy(smoothedResults, phase.length, resultArray, 0, phase.length);
+		System.arraycopy(smoothedResults, this.N, resultArray, 0, this.N);
 
 		return resultArray;
 	}
@@ -114,10 +141,9 @@ public class WaveForm {
 			throw new IllegalArgumentException("Method _" + this.waveformType + "_ not implemented yet.");
 		}
 
-		double[] magPhased = this.lc.getMagPhased();
-		double[] residual = new double[magPhased.length];
-		for (int i = 0; i < magPhased.length; i++) {
-			residual[i] = magPhased[i] - waveform[i];
+		double[] residual = new double[this.N];
+		for (int i = 0; i < this.N; i++) {
+			residual[i] = this.magPhased[i] - waveform[i];
 		}
 		return residual;
 	}
@@ -133,7 +159,7 @@ public class WaveForm {
 		int polynom = 3; // Default polynomial order
 
 		if ("uneven_savgol".equals(this.waveformType)) {
-			int wd = (int) Math.round(0.1 * this.lc.getN());
+			int wd = (int) Math.round(0.1 * this.N);
 			if (wd % 2 == 0)
 				wd += 1; // Ensure window is odd
 			window = wd; // Use default window size calculated from the light curve

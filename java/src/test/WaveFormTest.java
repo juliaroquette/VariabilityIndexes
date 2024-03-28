@@ -48,8 +48,8 @@ import source.FoldedLightCurve;
  */
 
 public class WaveFormTest {
-
-	private WaveForm waveform;
+	private WaveForm waveformFromLightCurve;
+	private WaveForm waveformFromParameters;
 	private final double delta = 1e-14;
 	private double[] expectedResiduals;
 
@@ -78,31 +78,65 @@ public class WaveFormTest {
 		LightCurve lc = new LightCurve(time, mag, err, mask);
 		FoldedLightCurve flc = new FoldedLightCurve(lc, period);
 
-		this.waveform = new WaveForm(flc, "uneven_savgol");
+		// Create WaveForm using the Folded Light Curve
+		this.waveformFromLightCurve = new WaveForm(flc, "uneven_savgol");
+		// Create WaveForm using the phase and magPhased arrays
+		double[] phase = flc.getPhase();
+		double[] magPhased = flc.getMagPhased();
+		this.waveformFromParameters = new WaveForm(phase, magPhased, "uneven_savgol");
 
 		this.expectedResiduals = ExpectedValuesForTests.EXPECTED_RESIDUALS_FOR_QINDEX;
 	}
 
 	/**
-	 * Verifies correct residual magnitude calculation with specified parameters.
+	 * Verifies correct residual magnitude calculation with specified parameters,
+	 * using the waveformFromLightCurve object.
 	 */
 	@Test
 	public void testResidualMagnitudeWithParameters() {
 		int window = 11;
 		int polynom = 3;
 
-		double[] actualResiduals = waveform.residualMagnitude(window, polynom);
+		double[] actualResiduals = waveformFromLightCurve.residualMagnitude(window, polynom);
 
 		Assertions.assertArrayEquals(expectedResiduals, actualResiduals, delta,
 				"Residual magnitudes do not match expected values with parameters.");
 	}
 
 	/**
-	 * Checks residual magnitude calculation with default parameters.
+	 * Checks residual magnitude calculation with default parameters, using the
+	 * waveformFromLightCurve object.
 	 */
 	@Test
 	public void testResidualMagnitudeWithoutParameters() {
-		double[] actualResiduals = waveform.residualMagnitude();
+		double[] actualResiduals = waveformFromLightCurve.residualMagnitude();
+
+		Assertions.assertArrayEquals(expectedResiduals, actualResiduals, delta,
+				"Residual magnitudes do not match expected default values.");
+	}
+
+	/**
+	 * Verifies correct residual magnitude calculation with specified parameters,
+	 * using the waveformFromParameters object.
+	 */
+	@Test
+	public void testResidualMagnitudeWithParametersSecondConstructor() {
+		int window = 11;
+		int polynom = 3;
+
+		double[] actualResiduals = waveformFromParameters.residualMagnitude(window, polynom);
+
+		Assertions.assertArrayEquals(expectedResiduals, actualResiduals, delta,
+				"Residual magnitudes do not match expected values with parameters.");
+	}
+
+	/**
+	 * Checks residual magnitude calculation with default parameters, using the
+	 * waveformFromParameters object.
+	 */
+	@Test
+	public void testResidualMagnitudeWithoutParametersSecondConstructor() {
+		double[] actualResiduals = waveformFromParameters.residualMagnitude();
 
 		Assertions.assertArrayEquals(expectedResiduals, actualResiduals, delta,
 				"Residual magnitudes do not match expected default values.");
