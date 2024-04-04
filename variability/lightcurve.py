@@ -257,10 +257,13 @@ class FoldedLightCurve(LightCurve):
         # Calculate the phase values
         phase = np.mod(self.time, self._timescale) / self._timescale
         # Sort the phase and magnitude arrays based on phase values
+        phase_number = np.floor(self.time/self._timescale)
         sort = np.argsort(phase)
         self.phase = phase[sort]
         self.mag_phased = self.mag[sort]       
         self.err_phased = self.err[sort]
+        self.phase_number = phase_number[sort]
+        
         
     @property
     def timescale(self):
