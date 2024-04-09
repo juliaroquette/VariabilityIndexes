@@ -769,7 +769,7 @@ class SyntheticLightCurve:
         -> dXt = theta * (mu - Xt) dt + sigma * dWt
         where:
         - Xt is the state of the process at time t
-        - theta is the "rate of mean reversion"
+        - theta is the "rate of mean reversion" 
         - mu is the mean value of the process
         - sigma is the volatility of the process
         - Wt is a Wiener process (Brownian motion)
@@ -807,8 +807,10 @@ class SyntheticLightCurve:
         
         
         """
-        dt = time[1:] - time[:-1]
-        mag = np.full(len(time), mu, dtype=float) #I am imposing that the initial condition is actually de mean of the process
+        dt =  512./60./60/24./2 # the default cadence is half of the CoRoT cadence.
+        N = int((max(time) - min(time))/dt)        
+        mag = np.full(N, mu, dtype=float) #I am imposing that the initial condition is actually de mean of the process
+        _time = np.linspace(min(time), max(time), N)
         
         def a_Xnt(tau,
                   mag,
@@ -825,7 +827,9 @@ class SyntheticLightCurve:
             """
             return np.random.normal(loc=0, scale=np.sqrt(dt_))
         
-        dWs = dW(dt)
-        mag[1:] = mag[:-1] + a_Xnt(tau, mag[:-1],  mu) * dt + b_Xnt(sigma, tau) * dWs
-        return mag
+        for i in range(N - 1):
+            mag[i + 1] = mag[i] + a_Xnt(tau, mag[i],  mu) * dt + b_Xnt(sigma, tau) * dW(dt)
+        
+        
+        return np.interp(time, _time, mag)
 
