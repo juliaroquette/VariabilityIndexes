@@ -3,7 +3,7 @@
 **@juliaroquette** Package under development for deriving Q&M indexes (and a few other variability indexes) for any time type of light-curves.
 
 
-**Last Update**: 15 March 2024
+**Last Update**: 8th April 2024
 
 In this current version, one can import and use it by doing:
 
