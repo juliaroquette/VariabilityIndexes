@@ -1,3 +1,5 @@
+# A Python package for estimating variability features from any kind of light-curves
+
 **@juliaroquette** Package under development for deriving Q&M indexes (and a few other variability indexes) for any time type of light-curves.
 
 
