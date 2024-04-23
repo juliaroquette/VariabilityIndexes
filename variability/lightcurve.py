@@ -247,7 +247,7 @@ class FoldedLightCurve(LightCurve):
         # define a WaveForm Object
         self.wf = WaveForm(self.phase, self.mag_phased)
         #  check if specific window parameters were passed as input
-        self._waveform_params = kwargs.get('waveform_params', {'window': round(.25*self.N),
+        self._waveform_params = kwargs.get('waveform_params', {'window': round(.15*self.N),
                                                     'polynom': 1})
         # check if a specific waveform type was passed as input
         self._waveform_type = kwargs.get('waveform_type', 'uneven_savgol')
@@ -286,18 +286,86 @@ class FoldedLightCurve(LightCurve):
                                              waveform_params=kwargs.get('waveform_params', self._waveform_params))
         # phasefolded lightcurves also have a residual curve between the waveform and the lightcurve
         self.residual = self.wf.residual_magnitude(self.waveform)
+        
+
 
 class SyntheticLightCurve:
     """
     A class to generate synthetic light curves.
     
+    Being refactored
+    """
+    def __init__(self, 
+                 faint=False,
+                 model = 'sinusoidal',
+                 **kwargs):
+        # Generate a high-cadence, long time-span light-curve for reference
+        # cadence = double CoRoT
+        _CADENCE = 512./60./60/24. 
+        # Total timespan of a decade
+        _T = 365.5*10 
+        # time array for ground truth
+        self._time = np.linspace(0, _T, np.ceil(_T/_CADENCE))
+        # activate parameters common to all models
+        if 'ptp_amp' in kwargs.keys():
+            self._PTP_AMP = kwargs['ptp_amp']
+        else:
+            self._PTP_AMP = 0.1
+            warnings.warn(f'Peak-to-peak amplitude not provided, using default value of {self._PTP_AMP}')
+        if 'timescale' in kwargs.keys():
+            self._TIMESCALE = kwargs['timescale']
+        else:
+            self._TIMESCALE = 8.
+            warnings.warn(f'Timescale not provided, using default value of {self._TIMESCALE}')
+        # activate the model
+        if model == 'sinusoidal':
+            # requires ptp_amp, timescale and phase
+            self._model_name = model
+            # load model specific attributes
+            self._phase = kwargs.get('phase', 0.)
+            # define magnitude variation ground truth
+            self._mag = periodic_symmetric(self._PTP_AMP, 
+                                           self._TIMESCALE, 
+                                           phi_0 = self._phase)
+
+        elif model == 'quasiperiodic':
+            pass
+        elif model == 'stochastic':
+            pass
+        elif model == 'eclipsing_binary':
+            pass
+        else:
+            raise ValueError('Invalid model, possible values are: sinusoidal, quasiperiodic, stochastic, eclipsing_binary')
+    
+    def periodic_symmetric(self, 
+                           ptp_amp,
+                           period, 
+                           phi_0=0.):
+        """
+        Periodic Symmetric light-curve
+        """
+        return  0.5 * ptp_amp * np.sin(2. * np.pi * \
+            (self.time - np.min(self.time))/ period + phi_0)
+    
+ 
+    
+ 
+    
+class SyntheticLightCurve_:
+    """
+    A class to generate synthetic light curves.
+    
     Has the same structure as a LightCurve object. 
+    
+    TO DO: 
+    restructure the code to first generate a highly populated light-curve 
+    and just then convolute to the observational window. 
     
     """
     def __init__(self, 
                  faint=False,
+                 
                  **kwargs):
-
         # check if an observational window was passed as input        
         if 'time' in kwargs.keys():
             mask = np.where(np.isfinite(kwargs['time']))[0]
@@ -488,7 +556,10 @@ class SyntheticLightCurve:
             observational_windows_filenames[survey_window])
         self.time = df['jd_norm'].to_numpy()
         
-    
+    def stochastic(self):
+        np.random.seed(42)
+        self.mag_s = self.Ornstein_Uhlenbeck(self.time, tau=10, sigma=0.05, mu=15)
+        
     def periodic_symmetric(self, 
                            ptp_amp=None,
                            period=None, 
@@ -833,3 +904,282 @@ class SyntheticLightCurve:
         
         return np.interp(time, _time, mag)
 
+class observational_window:
+    """
+    Class for loading observational windows for different variability surveys
+    of interest
+    
+    Goal:
+    simulation.survey.faint.LC
+    """
+    def __init__(self, 
+                 survey, 
+                 ground_truth=(None, None), 
+                 timescale=None):
+        
+        # load the survey
+        
+        # use ground truth to generate time and mag arrays with the observational window time sampling
+        
+        # return the time and mag arrays with noise
+            # for that define self.faint.FoldedLightCurve and self.bright.FoldedLightCurve
+        # load the survey window
+        if survey == 'K2':
+            n_epochs, time, faint, bright = self._K2_window()
+        elif survey == 'CoRoT':
+            self._CoRoT_window()
+        elif survey == 'TESS':
+            self._TESS_window()
+        # TO DO add the rest of the surveys
+         
+            
+        # faint star model
+        noisy_mag_faint, err_faint = make_noisy_mag(faint['mean_mag'], 
+                                          faint['noise_level'], 
+                                          faint['rms_noise'],
+                                          n_epochs)
+        noisy_mag_bright, err_bright = make_noisy_mag(bright['mean_mag'], 
+                                          bright['noise_level'], 
+                                          bright['rms_noise'],
+                                          n_epochs)
+        # test if I ground truth is provided
+        if bool(ground_truth[0]):
+            # resample faint star to the ground truth
+            time_ground, mag_ground = ground_truth
+            mag_groun_to_obs_win = resample_from_lc(time_ground, mag_ground, time)
+            mag_faint = mag_groun_to_obs_win + noisy_mag_faint
+            mag_bright = mag_groun_to_obs_win + noisy_mag_bright
+        else:
+            mag_faint = noisy_mag_faint
+            mag_bright = noisy_mag_bright
+        self.faint = FoldedLightCurve(time=time, 
+                                      mag=mag_faint, 
+                                      err=err_faint, 
+                                      timescale=timescale)
+        self.bright = FoldedLightCurve(time=time,
+                                        mag=mag_bright,
+                                        err=err_bright,
+                                        timescale=timescale)
+
+
+    def read_observational_window(self, survey_window):
+        """
+        Load an observational window from a file.
+
+        Args:
+            filename (str): The name of the file to read from.
+
+        Returns:
+            SyntheticLightCurve: The light curve object.
+        """
+        observational_windows_filenames = {
+            'AllWISE': 'AllWISE.csv',
+            'GaiaDR3': 'gaia_DR3.csv',
+            'GaiaDR4': 'gaia_DR4.csv',
+            'GaiaDR4-geq20': 'gaia_DR4_high.csv',
+            'GaiaDR5': 'gaia_DR5.csv',
+            'TESS': 'TESS.csv',
+            'ZTF': 'ZTF.csv',
+            'ASAS-SN-V': 'ASASSN_V.csv',
+            'ASAS-SN-g': 'ASASSN_g.csv',
+        }
+        df = pd.read_csv('../data/' + \
+            observational_windows_filenames[survey_window])
+        time = df['jd_norm'].to_numpy()
+        # makes sure time is ordered
+        return np.sort(time)
+    
+    @staticmethod
+    def make_noisy_mag(mean_mag, noise_level, rms_noise, n_epochs):  
+        """
+        Given a mean magnitude, noise level and rms noise, 
+        generate a noise baseline for a light-curve.
+        """
+        _err = np.random.normal(loc=noise_level, scale=rms_noise, n_epochs)
+        _noisy_mag = mean_mag + 1. * _err
+        _err = abs(_err)
+        return _noisy_mag, _err
+    
+    @staticmethod
+    def resample_from_lc(t_in, y_in, t_out):
+        """
+        Simple function for resampling a light-curve to a new time array.
+        """
+        # TO DO: include tests for when t_out is outside the range of t_in
+        return np.interp(t_out, t_in, y_in)
+    
+    @staticmethod
+    def _K2_window():
+        """ 
+        Based on a typical light-curve from K2 as in Cody+ 2018AJ....156...71C
+        Cadence: 1 observation every 30 minutes
+        Timespan: 78 days of observations
+        Kp = 8--18 mag 
+        10 - .15/100
+        15  0.0032
+        typical noise level is 1.8mmag at 16th Kp magnitude
+        """
+        cadence = 30./60./24. 
+        timespan = 80
+        faint = {'mean_mag': 15.,
+                'noise_level': 0.0032,
+                'rms_noise': 0.0032}
+        bright = {'mean_mag': 10.0,
+                'noise_level': 0.0015,
+                'rms_noise': 0.0015}
+        time = np.arange(0, timespan, cadence)
+        n_epochs = len(time)
+        return n_epochs, time, faint, bright
+
+
+    def _CoRoT_window():
+        """ 
+        Based on a typical light-curve from CoRoT as in Cody+ 2014AJ....147...82
+        Cadence: 1 observation every 512 s
+        Timespan: just over 37 days of observations
+        typical rms is 0.01-0.1 at 17th Kp magnitude
+        """
+        cadence = 512./60./60/24. 
+        timespan = 38.68
+        faint = {'mean_mag': 15.,
+                'noise_level': 0.01,
+                'rms_noise': 0.01}
+        bright = {'mean_mag': 12.0,
+                'noise_level': 0.001,
+                'rms_noise': 0.001}
+        time = np.arange(0, timespan, cadence)
+        n_epochs = len(time)
+        return n_epochs, time, faint, bright
+    
+    
+    def _TESS_window(self):
+        faint = {'mean_mag': 16.,
+                'noise_level': 0.01,
+                'rms_noise': 0.01}
+        bright = {'mean_mag': 10.0,
+                'noise_level': 0.0003,
+                'rms_noise': 0.0003}
+        time = read_observational_window(kwargs['survey_window'])
+        n_epochs = len(time)
+        return n_epochs, time, faint, bright
+
+    def _Rubin_window(self):
+        raise NotImplementedError
+    
+    def _ZTF_window(self):
+        faint = {'mean_mag': 18.,
+                'noise_level': 0.02,
+                'rms_noise': 0.02}
+        bright = {'mean_mag': 15.0,
+                'noise_level': 0.01,
+                'rms_noise': 0.01}
+        time = self.read_observational_window(kwargs['survey_window'])
+        
+    def _ASAS_SN_V_window(self):
+            # 'ASAS-SN-V':
+        faint = {'mean_mag': 15.,
+                 'noise_level': 0.04,
+                'rms_noise': 0.04}
+        bright = {'mean_mag': 12.0,
+                'noise_level': 0.02,
+                'rms_noise': 0.02}
+        time = self.read_observational_window(kwargs['survey_window'])
+        return n_epochs, time, faint, bright
+    
+    def _ASAS_SN_g_window(self):
+            # elif kwargs['survey_window'] == 'ASAS-SN-g':
+            faint = {'mean_mag': 15.,
+                 'noise_level': 0.04,
+                'rms_noise': 0.04}
+            bright = {'mean_mag': 12.0,
+                'noise_level': 0.02,
+                'rms_noise': 0.02}
+            time = self.read_observational_window(kwargs['survey_window'])
+    
+    def _Gaia_DR3_window(self):
+            # elif kwargs['survey_window'] == 'GaiaDR3':
+        if bool(faint):
+            mean_mag = 17.0 #12
+            noise_level = 0.0050 #0.001
+            rms_noise = 0.0050 # 0.001
+        else:
+            mean_mag = 12.5
+            noise_level = 0.0008
+            rms_noise = 0.0008 
+        self.read_observational_window(kwargs['survey_window'])
+                
+    def _Gaia_DR4_window(self, faint=False):
+    # elif kwargs['survey_window'] == 'GaiaDR4':
+        if bool(faint):
+            mean_mag = 17.0 #12
+            noise_level = 0.0050 #0.001
+            rms_noise = 0.0050 # 0.001
+        else:
+            mean_mag = 12.5
+            noise_level = 0.0008
+            rms_noise = 0.0008 
+        self.read_observational_window(kwargs['survey_window'])
+    
+    def _Gaia_DR4_geq20_window(self, faint=False):
+            # elif kwargs['survey_window'] == 'GaiaDR4-geq20':
+        if bool(faint):
+            mean_mag = 17.0 #12
+            noise_level = 0.0050 #0.001
+            rms_noise = 0.0050 # 0.001
+        else:
+            mean_mag = 12.5
+            noise_level = 0.0008
+            rms_noise = 0.0008 
+        self.read_observational_window(kwargs['survey_window'])        
+    
+    def _Gaia_DR5_window(self, faint=False):        
+            # elif kwargs['survey_window'] == 'GaiaDR5':
+        if bool(faint):
+            mean_mag = 17.0 #12
+            noise_level = 0.0050 #0.001
+            rms_noise = 0.0050 # 0.001
+        else:
+            mean_mag = 12.5
+            noise_level = 0.0008
+            rms_noise = 0.0008 
+        self.read_observational_window(kwargs['survey_window'])             
+            # elif kwargs['survey_window'] == 'AllWISE':
+                # if bool(faint):
+                #     mean_mag = 17.0 #12
+                #     noise_level = 0.0050 #0.001
+                #     rms_noise = 0.0050 # 0.001
+                # else:
+                #     mean_mag = 12.5
+                #     noise_level = 0.0008
+                #     rms_noise = 0.0008 
+                # self.read_observational_window(kwargs['survey_window'])
+                # raise NotImplementedError                
+            # else:
+                # raise ValueError('Invalid survey window, possible values are: K2, TESS, Rubin, ZTF, ASAS-SN, GaiaDR3, GaiaDR4, AllWISE, CoRoT')
+
+
+    
+
+# class window_noise_fingerprint:
+#     """
+#     Once the observational window is loaded, we can generate an observational 
+#     fingerprint based on the loaded parameters
+#     """
+#     def __init__(self, 
+#                  time, # time form the observational window
+#                  mag, # ground truth magnitude convolved to observational window
+#                  timescale # ground truth timescale                 
+#                  mean_mag, #average mag for faint sources for the observational window
+#                  noise_level, # typical noise for faint sources for the observational window
+#                  rms_noise, # noise rms for faint sources for the observational window
+#                  ):
+#         self.noise_level = noise_level
+#         self.rms_noise = rms_noise   
+#         _err = np.random.normal(loc=noise_level, scale=rms_noise, size=self.n_epochs) 
+#         _noisy_mag = mean_mag + 1. * _err
+#         _err = abs(self.err)
+        
+#         self.light_curve = FoldedLightCurve(time=time,
+#                                             mag= mean_mag + 1.* _err + mag,
+#                                             err=_err,
+#                                             timescale=timescale)
