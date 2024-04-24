@@ -296,7 +296,6 @@ class SyntheticLightCurve:
     Being refactored
     """
     def __init__(self, 
-                 faint=False,
                  model = 'sinusoidal',
                  **kwargs):
         # Generate a high-cadence, long time-span light-curve for reference
@@ -305,7 +304,7 @@ class SyntheticLightCurve:
         # Total timespan of a decade
         _T = 365.5*10 
         # time array for ground truth
-        self._time = np.linspace(0, _T, np.ceil(_T/_CADENCE))
+        self._time = np.linspace(0, _T, int(np.ceil(_T/_CADENCE)))
         # activate parameters common to all models
         if 'ptp_amp' in kwargs.keys():
             self._PTP_AMP = kwargs['ptp_amp']
@@ -324,7 +323,7 @@ class SyntheticLightCurve:
             # load model specific attributes
             self._phase = kwargs.get('phase', 0.)
             # define magnitude variation ground truth
-            self._mag = periodic_symmetric(self._PTP_AMP, 
+            self._mag = self.periodic_symmetric(self._PTP_AMP, 
                                            self._TIMESCALE, 
                                            phi_0 = self._phase)
 
@@ -336,6 +335,12 @@ class SyntheticLightCurve:
             pass
         else:
             raise ValueError('Invalid model, possible values are: sinusoidal, quasiperiodic, stochastic, eclipsing_binary')
+        # create a light-curve object for each survey
+        for survey in ObservationalWindow.surveys_object_names.keys():
+            setattr(self, survey, 
+                    ObservationalWindow(survey, 
+                                        ground_truth=(self._time, self._mag),
+                                        timescale=self._TIMESCALE))
     
     def periodic_symmetric(self, 
                            ptp_amp,
@@ -345,7 +350,7 @@ class SyntheticLightCurve:
         Periodic Symmetric light-curve
         """
         return  0.5 * ptp_amp * np.sin(2. * np.pi * \
-            (self.time - np.min(self.time))/ period + phi_0)
+            (self._time - np.min(self._time))/ period + phi_0)
     
  
     
@@ -923,6 +928,19 @@ class ObservationalWindow:
     Goal:
     simulation.survey.faint.LC
     """
+    surveys_object_names = {
+            'AllWISE': 'AllWISE',
+            'GaiaDR3': 'GaiaDR3',
+            'GaiaDR4': 'GaiaDR4',
+            'GaiaDR4-geq20': 'GaiaDR4geq20',
+            'GaiaDR5': 'GaiaDR5',
+            'TESS': 'TESS',
+            'ZTF': 'ZTF',
+            'ASAS-SN-V': 'ASASSN_V',
+            'ASAS-SN-g': 'ASASSN_g',
+            'K2': 'K2',
+            'CoRoT': 'CoRoT'
+        }
     def __init__(self, 
                  survey, 
                  ground_truth=(None, None), 
@@ -951,7 +969,9 @@ class ObservationalWindow:
         elif survey == 'GaiaDR5':
             time, faint, bright = self._GaiaDR5_window()
         elif survey == 'AllWISE':
-            time, faint, bright = self._AllWISE_window()            
+            time, faint, bright = self._AllWISE_window()
+        elif survey == 'custom':
+            raise NotImplementedError     
         # faint star model
         noisy_mag_faint, err_faint = self.make_noisy_mag(faint['mean_mag'], 
                                           faint['noise_level'], 
@@ -961,16 +981,16 @@ class ObservationalWindow:
                                           bright['noise_level'], 
                                           len(time))
         # test if I ground truth is provided
-        if bool(ground_truth[0]):
+        if ground_truth[0] is not None:
             # resample faint star to the ground truth
             time_ground, mag_ground = ground_truth
-            mag_groun_to_obs_win = self.resample_from_lc(time_ground, mag_ground, time)
+            mag_ground_to_obs_win = self.resample_from_lc(time_ground, mag_ground, time)
 
         else:
-            mag_groun_to_obs_win = 0.
+            mag_ground_to_obs_win = 0.
 
-        mag_faint = mag_groun_to_obs_win + noisy_mag_faint
-        mag_bright = mag_groun_to_obs_win + noisy_mag_bright            
+        mag_faint = mag_ground_to_obs_win + noisy_mag_faint
+        mag_bright = mag_ground_to_obs_win + noisy_mag_bright            
         # create the light-curve objects
         self.faint = FoldedLightCurve(time=time, 
                                       mag=mag_faint, 
@@ -1021,7 +1041,7 @@ class ObservationalWindow:
                                 scale=noise_level, 
                                 size=n_epochs)
 
-        _err = np.ones(n_epochs) * noise_level
+        _err = np.full_like(_noisy_mag, noise_level)
         return _noisy_mag, _err
     
     @staticmethod
