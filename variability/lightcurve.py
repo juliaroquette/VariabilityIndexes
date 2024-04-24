@@ -925,11 +925,30 @@ class observational_window:
             # for that define self.faint.FoldedLightCurve and self.bright.FoldedLightCurve
         # load the survey window
         if survey == 'K2':
-            n_epochs, time, faint, bright = self._K2_window()
+            time, faint, bright = self._K2_window()
         elif survey == 'CoRoT':
-            self._CoRoT_window()
+            time, faint, bright = self._CoRoT_window()
         elif survey == 'TESS':
-            self._TESS_window()
+            time, faint, bright = self._TESS_window()
+        elif survey == 'Rubin':
+            raise NotImplementedError
+        elif survey == 'ZTF':
+            time, faint, bright = self._ZTF_window()
+        elif survey == 'ASAS-SN-V':
+            time, faint, bright = self._ASAS_SN_V_window()
+        elif survey == 'ASAS-SN-g':
+            time, faint, bright = self._ASAS_SN_g_window()
+        elif survey == 'GaiaDR3':
+            time, faint, bright = self._GaiaDR3_window()
+        elif survey == 'GaiaDR4':
+            time, faint, bright = self._GaiaDR4_window()
+        elif survey == 'GaiaDR4-geq20':
+            time, faint, bright = self._GaiaDR4_geq20_window()
+        elif survey == 'GaiaDR5':
+            time, faint, bright = self._GaiaDR5_window()
+        elif survey == 'AllWISE':
+            time, faint, bright = self._AllWISE_window()
+            
         # TO DO add the rest of the surveys
          
             
@@ -937,11 +956,11 @@ class observational_window:
         noisy_mag_faint, err_faint = make_noisy_mag(faint['mean_mag'], 
                                           faint['noise_level'], 
                                           faint['rms_noise'],
-                                          n_epochs)
+                                          len(time))
         noisy_mag_bright, err_bright = make_noisy_mag(bright['mean_mag'], 
                                           bright['noise_level'], 
                                           bright['rms_noise'],
-                                          n_epochs)
+                                          len(time))
         # test if I ground truth is provided
         if bool(ground_truth[0]):
             # resample faint star to the ground truth
@@ -990,12 +1009,17 @@ class observational_window:
         return np.sort(time)
     
     @staticmethod
-    def make_noisy_mag(mean_mag, noise_level, rms_noise, n_epochs):  
+    def make_noisy_mag(mean_mag, 
+                       noise_level, 
+                       rms_noise, 
+                       n_epochs):  
         """
         Given a mean magnitude, noise level and rms noise, 
         generate a noise baseline for a light-curve.
         """
-        _err = np.random.normal(loc=noise_level, scale=rms_noise, n_epochs)
+        _err = np.random.normal(loc=noise_level, 
+                                scale=rms_noise, 
+                                size=n_epochs)
         _noisy_mag = mean_mag + 1. * _err
         _err = abs(_err)
         return _noisy_mag, _err
@@ -1008,7 +1032,6 @@ class observational_window:
         # TO DO: include tests for when t_out is outside the range of t_in
         return np.interp(t_out, t_in, y_in)
     
-    @staticmethod
     def _K2_window():
         """ 
         Based on a typical light-curve from K2 as in Cody+ 2018AJ....156...71C
@@ -1028,8 +1051,7 @@ class observational_window:
                 'noise_level': 0.0015,
                 'rms_noise': 0.0015}
         time = np.arange(0, timespan, cadence)
-        n_epochs = len(time)
-        return n_epochs, time, faint, bright
+        return time, faint, bright
 
 
     def _CoRoT_window():
@@ -1048,8 +1070,7 @@ class observational_window:
                 'noise_level': 0.001,
                 'rms_noise': 0.001}
         time = np.arange(0, timespan, cadence)
-        n_epochs = len(time)
-        return n_epochs, time, faint, bright
+        return time, faint, bright
     
     
     def _TESS_window(self):
@@ -1059,9 +1080,8 @@ class observational_window:
         bright = {'mean_mag': 10.0,
                 'noise_level': 0.0003,
                 'rms_noise': 0.0003}
-        time = read_observational_window(kwargs['survey_window'])
-        n_epochs = len(time)
-        return n_epochs, time, faint, bright
+        time = self.read_observational_window('TESS')
+        return time, faint, bright
 
     def _Rubin_window(self):
         raise NotImplementedError
@@ -1073,7 +1093,8 @@ class observational_window:
         bright = {'mean_mag': 15.0,
                 'noise_level': 0.01,
                 'rms_noise': 0.01}
-        time = self.read_observational_window(kwargs['survey_window'])
+        time = self.read_observational_window('ZTF')
+        return time, faint, bright
         
     def _ASAS_SN_V_window(self):
             # 'ASAS-SN-V':
@@ -1083,79 +1104,74 @@ class observational_window:
         bright = {'mean_mag': 12.0,
                 'noise_level': 0.02,
                 'rms_noise': 0.02}
-        time = self.read_observational_window(kwargs['survey_window'])
-        return n_epochs, time, faint, bright
-    
+        time = self.read_observational_window('ASAS-SN-V')
+        return time, faint, bright
+
     def _ASAS_SN_g_window(self):
-            # elif kwargs['survey_window'] == 'ASAS-SN-g':
-            faint = {'mean_mag': 15.,
-                 'noise_level': 0.04,
-                'rms_noise': 0.04}
-            bright = {'mean_mag': 12.0,
-                'noise_level': 0.02,
-                'rms_noise': 0.02}
-            time = self.read_observational_window(kwargs['survey_window'])
+        # elif kwargs['survey_window'] == 'ASAS-SN-g':
+        faint = {'mean_mag': 15.,
+                'noise_level': 0.04,
+            'rms_noise': 0.04}
+        bright = {'mean_mag': 12.0,
+            'noise_level': 0.02,
+            'rms_noise': 0.02}
+        time = self.read_observational_window('ASAS-SN-g')
+        return time, faint, bright
     
     def _Gaia_DR3_window(self):
             # elif kwargs['survey_window'] == 'GaiaDR3':
-        if bool(faint):
-            mean_mag = 17.0 #12
-            noise_level = 0.0050 #0.001
-            rms_noise = 0.0050 # 0.001
-        else:
-            mean_mag = 12.5
-            noise_level = 0.0008
-            rms_noise = 0.0008 
-        self.read_observational_window(kwargs['survey_window'])
+        faint = {'mean_mag': 17.0,
+                'noise_level': 0.0050,
+                'rms_noise': 0.0050}
+        bright = {'mean_mag': 12.5,
+                'noise_level': 0.0008,
+                'rms_noise': 0.0008}
+        time = self.read_observational_window('GaiaDR3')
+        return time, faint, bright
                 
-    def _Gaia_DR4_window(self, faint=False):
+    def _Gaia_DR4_window(self):
     # elif kwargs['survey_window'] == 'GaiaDR4':
-        if bool(faint):
-            mean_mag = 17.0 #12
-            noise_level = 0.0050 #0.001
-            rms_noise = 0.0050 # 0.001
-        else:
-            mean_mag = 12.5
-            noise_level = 0.0008
-            rms_noise = 0.0008 
-        self.read_observational_window(kwargs['survey_window'])
+        faint = {'mean_mag': 17.0,
+                 'noise_level': 0.0050,
+                'rms_noise': 0.0050}
+        bright = {'mean_mag': 12.5,
+                  'noise_level': 0.0008,
+                    'rms_noise': 0.0008}
+        time = self.read_observational_window('GaiaDR4')
+        return time, faint, bright
+
+             
+    def _Gaia_DR4_geq20_window(self):
+        # elif kwargs['survey_window'] == 'GaiaDR4-geq20':
+        faint = {'mean_mag': 17.0,
+                'noise_level': 0.0050,
+                'rms_noise': 0.0050}
+        bright = {'mean_mag': 12.5,
+                'noise_level': 0.0008,
+                'rms_noise': 0.0008}
+        time = self.read_observational_window('GaiaDR4-geq20')     
+        return time, faint, bright   
     
-    def _Gaia_DR4_geq20_window(self, faint=False):
-            # elif kwargs['survey_window'] == 'GaiaDR4-geq20':
-        if bool(faint):
-            mean_mag = 17.0 #12
-            noise_level = 0.0050 #0.001
-            rms_noise = 0.0050 # 0.001
-        else:
-            mean_mag = 12.5
-            noise_level = 0.0008
-            rms_noise = 0.0008 
-        self.read_observational_window(kwargs['survey_window'])        
-    
-    def _Gaia_DR5_window(self, faint=False):        
+    def _Gaia_DR5_window(self):        
             # elif kwargs['survey_window'] == 'GaiaDR5':
-        if bool(faint):
-            mean_mag = 17.0 #12
-            noise_level = 0.0050 #0.001
-            rms_noise = 0.0050 # 0.001
-        else:
-            mean_mag = 12.5
-            noise_level = 0.0008
-            rms_noise = 0.0008 
-        self.read_observational_window(kwargs['survey_window'])             
-            # elif kwargs['survey_window'] == 'AllWISE':
-                # if bool(faint):
-                #     mean_mag = 17.0 #12
-                #     noise_level = 0.0050 #0.001
-                #     rms_noise = 0.0050 # 0.001
-                # else:
-                #     mean_mag = 12.5
-                #     noise_level = 0.0008
-                #     rms_noise = 0.0008 
-                # self.read_observational_window(kwargs['survey_window'])
-                # raise NotImplementedError                
-            # else:
-                # raise ValueError('Invalid survey window, possible values are: K2, TESS, Rubin, ZTF, ASAS-SN, GaiaDR3, GaiaDR4, AllWISE, CoRoT')
+        faint = {'mean_mag': 17.0,
+                'noise_level': 0.0050,
+                'rms_noise': 0.0050}
+        bright = {'mean_mag': 12.5,
+                'noise_level': 0.0008,
+                'rms_noise': 0.0008}
+        time = self.read_observational_window('GaiaDR5')            
+        return time, faint, bright
+    
+    def _AllWISE_window(self):
+        faint = {'mean_mag': 17.0,
+                'noise_level': 0.0050,
+                'rms_noise': 0.0050}
+        bright = {'mean_mag': 12.5,
+                'noise_level': 0.0008,
+                'rms_noise': 0.0008}
+        time = self.read_observational_window('AllWISE')
+        return time, faint, bright
 
 
     
