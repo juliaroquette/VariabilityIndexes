@@ -296,7 +296,7 @@ class SyntheticLightCurve:
     Being refactored
     """
     def __init__(self, 
-                 model = 'sinusoidal',
+                 model='sinusoidal',
                  **kwargs):
         # Generate a high-cadence, long time-span light-curve for reference
         # cadence = double CoRoT
@@ -310,12 +310,12 @@ class SyntheticLightCurve:
             self._PTP_AMP = kwargs['ptp_amp']
         else:
             self._PTP_AMP = 0.1
-            warnings.warn(f'Peak-to-peak amplitude not provided, using default value of {self._PTP_AMP}')
+            warnings.warn(f"Peak-to-peak amplitude not provided, using default value of {self._PTP_AMP}")
         if 'timescale' in kwargs.keys():
             self._TIMESCALE = kwargs['timescale']
         else:
             self._TIMESCALE = 8.
-            warnings.warn(f'Timescale not provided, using default value of {self._TIMESCALE}')
+            warnings.warn(f"Timescale not provided, using default value of {self._TIMESCALE}")
         # activate the model
         if model == 'sinusoidal':
             # requires ptp_amp, timescale and phase
@@ -326,13 +326,22 @@ class SyntheticLightCurve:
             self._mag = self.periodic_symmetric(self._PTP_AMP, 
                                            self._TIMESCALE, 
                                            phi_0 = self._phase)
-
+        elif model == 'eclipsing_binary':
+            self._model_name = model
+            self.secondary_fraction = kwargs.get('secondary_fraction', 0.2)
+            self.eclipse_duration = kwargs.get('eclipse_duration', 0.15)
+            self.primary_eclipse_start = kwargs.get('primary_eclipse_start', 0.)
+            self._mag = self.eclipsing_binary(self._PTP_AMP,
+                                            self._TIMESCALE, 
+                                            secondary_fraction=self.secondary_fraction,
+                                            eclipse_duration=self.eclipse_duration,
+                                            primary_eclipse_start=self.primary_eclipse_start)
+            
         elif model == 'quasiperiodic':
             pass
         elif model == 'stochastic':
             pass
-        elif model == 'eclipsing_binary':
-            pass
+
         else:
             raise ValueError('Invalid model, possible values are: sinusoidal, quasiperiodic, stochastic, eclipsing_binary')
         # create a light-curve object for each survey
@@ -351,6 +360,38 @@ class SyntheticLightCurve:
         """
         return  0.5 * ptp_amp * np.sin(2. * np.pi * \
             (self._time - np.min(self._time))/ period + phi_0)
+    
+    def eclipsing_binary(self,
+                         ptp_amp,
+                         period, 
+                         secondary_fraction=0.2, # primary_ptp/secondary_ptp
+                         eclipse_duration=0.15, #in terms of phase
+                         primary_eclipse_start=0.    # Start time of the eclipse
+                         ):
+        '''
+        Generates a lc with for a strictly periodic and eclipsing-like lightcurve
+        '''
+        assert secondary_fraction < 1, "Secondary fraction must be smaller than 1"
+        assert primary_eclipse_start + eclipse_duration < 0.5, "First eclipse must happen in the first half of the period"
+        # make a base magnitude array
+        mag_eb = np.zeros_like(self._time)
+        # calculate the phase for given period
+        phase =  (self._time - min(self._time))/period - np.floor((self._time-min(self._time))/period)
+        # define eclipse parameters
+        secondary_eclipse_start = primary_eclipse_start + 0.5  # Start time of the eclipse
+        primary_eclipse_depth = ptp_amp  # Depth of the eclipse (0.0 to 1.0)
+        # select parts of the phased light-curve to be eclipsed
+        primary_eclipse = np.logical_and(phase >= primary_eclipse_start, phase <= primary_eclipse_start + eclipse_duration)
+        secondary_eclipse = np.logical_and(phase >= primary_eclipse_start + 0.5, phase <= primary_eclipse_start + 0.5 + eclipse_duration)
+        # Convert phase fraction to be eclipsed into appropriate radian values for the model
+        phi_ = (phase[primary_eclipse] - primary_eclipse_start) * np.pi / eclipse_duration 
+        # eclipse relevant parts of the light-curve
+        mag_eb[primary_eclipse] += primary_eclipse_depth * \
+            np.sin(phi_)
+        # repeat for secondary eclipse
+        phi_ = (phase[secondary_eclipse] - secondary_eclipse_start) * np.pi / eclipse_duration            
+        mag_eb[secondary_eclipse] += secondary_fraction * primary_eclipse_depth * np.sin(phi_)
+        return mag_eb
     
  
     
