@@ -296,15 +296,16 @@ class SyntheticLightCurve:
     Being refactored
     """
     def __init__(self, 
-                 model='sinusoidal',
+                 model='periodic_symmetric',
                  **kwargs):
         # Generate a high-cadence, long time-span light-curve for reference
-        # cadence = double CoRoT
+        # Cadence is the same as CoRoT
         _CADENCE = 512./60./60/24. 
         # Total timespan of a decade
         _T = 365.5*10 
         # time array for ground truth
         self._time = np.linspace(0, _T, int(np.ceil(_T/_CADENCE)))
+        # print(self._time.shape)
         # activate parameters common to all models
         if 'ptp_amp' in kwargs.keys():
             self._PTP_AMP = kwargs['ptp_amp']
@@ -317,7 +318,8 @@ class SyntheticLightCurve:
             self._TIMESCALE = 8.
             warnings.warn(f"Timescale not provided, using default value of {self._TIMESCALE}")
         # activate the model
-        if model == 'sinusoidal':
+
+        if model == 'periodic_symmetric':
             # requires ptp_amp, timescale and phase
             self._model_name = model
             # load model specific attributes
@@ -326,6 +328,7 @@ class SyntheticLightCurve:
             self._mag = self.periodic_symmetric(self._PTP_AMP, 
                                            self._TIMESCALE, 
                                            phi_0 = self._phase)
+            
         elif model == 'eclipsing_binary':
             self._model_name = model
             self.secondary_fraction = kwargs.get('secondary_fraction', 0.2)
@@ -350,6 +353,11 @@ class SyntheticLightCurve:
                     ObservationalWindow(survey, 
                                         ground_truth=(self._time, self._mag),
                                         timescale=self._TIMESCALE))
+        # Ground Truth LCs need to be undersampled otherwise waveform estimator is too slow
+        self.ground_truth = FoldedLightCurve(time=self._time[::50], 
+                                            mag=self._mag[::50], 
+                                            err=np.zeros(len(self._mag[::50])), 
+                                            timescale=self._TIMESCALE)
     
     def periodic_symmetric(self, 
                            ptp_amp,
@@ -393,7 +401,45 @@ class SyntheticLightCurve:
         mag_eb[secondary_eclipse] += secondary_fraction * primary_eclipse_depth * np.sin(phi_)
         return mag_eb
     
- 
+    def quasiperiodic_symmetric(self,
+                                ptp_amp, 
+                                period, 
+                                phi_0=0., 
+                                std=0.05, 
+                                ptp_min=0.):
+        '''
+      quasiperiodic symmetric
+            
+        TO DO: We need to add a few constraints to the degree of quasiperiodicity
+        (for example, it has to be smaller than a fraction of the amplitude)
+        '''
+        
+        amp_t = ptp_min + abs(self.random_walk_1D(n_steps=len(self._time),
+                                    ptp=ptp_amp,
+                                    std=std,
+                                    type_of_step='normal'))
+        return 0.5 * amp_t * np.sin(2 * np.pi * (self._time - np.min(self._time)) / period + phi_0) 
+    
+    def AATau(self, 
+           ptp_amp, 
+           period, 
+           dip_width=0.9, #in terms of phase
+           dip_start = 0.05    # Start time of the eclipse
+           ):
+        '''
+        Generates a lc with for a AA Tau-like lightcurve
+        '''
+        assert dip_width < 1, "Dip-width must be smaller than 1"
+        # assert primary_eclipse_start + eclipse_duration < 0.5, "First eclipse must happen in the first half of the period"
+        phase =  (self._time - min(self._time))/period - np.floor((self._time - min(self._time))/period)
+        # generates amplitudes for each phase
+        n_phase = np.floor((self.time - min(self.time))/period)
+        #
+        dip_in = np.logical_and(phase >= dip_start, phase <= dip_start + dip_width)
+        phi_ = (phase[dip_in] - dip_start) * np.pi / dip_width
+        ptp_A = self.random_walk_1D(len(self.time), ptp_amp)
+        self.mag_AATau[dip_in] -= abs(ptp_A[dip_in]) * np.sin(phi_)
+    
     
  
     
@@ -1021,14 +1067,25 @@ class ObservationalWindow:
         noisy_mag_bright, err_bright = self.make_noisy_mag(bright['mean_mag'], 
                                           bright['noise_level'], 
                                           len(time))
+     
         # test if I ground truth is provided
         if ground_truth[0] is not None:
             # resample faint star to the ground truth
             time_ground, mag_ground = ground_truth
             mag_ground_to_obs_win = self.resample_from_lc(time_ground, mag_ground, time)
+            self.ground_truth_faint = FoldedLightCurve(time=time,
+                                        mag=mag_ground_to_obs_win + faint['mean_mag'],
+                                        err=np.zeros(len(mag_ground_to_obs_win)),
+                                        timescale=timescale)
+            self.ground_truth_bright = FoldedLightCurve(time=time,
+                                        mag=mag_ground_to_obs_win + bright['mean_mag'],
+                                        err=np.zeros(len(mag_ground_to_obs_win)),
+                                        timescale=timescale)            
 
         else:
             mag_ground_to_obs_win = 0.
+            self.ground_truth_faint = None
+            self.ground_truth_bright = None
 
         mag_faint = mag_ground_to_obs_win + noisy_mag_faint
         mag_bright = mag_ground_to_obs_win + noisy_mag_bright            
@@ -1040,7 +1097,9 @@ class ObservationalWindow:
         self.bright = FoldedLightCurve(time=time,
                                         mag=mag_bright,
                                         err=err_bright,
-                                        timescale=timescale)
+                                        timescale=timescale)   
+
+
 
 
     def read_observational_window(self, survey_window):
