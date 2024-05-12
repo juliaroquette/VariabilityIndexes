@@ -1034,29 +1034,29 @@ class ObservationalWindow:
                  timescale=None):
         # load the survey window
         if survey == 'K2':
-            time, faint, bright = self._K2_window()
+            time, faint, bright, waveform_type, waveform_params = self._K2_window()
         elif survey == 'CoRoT':
-            time, faint, bright = self._CoRoT_window()
+            time, faint, bright, waveform_type, waveform_params = self._CoRoT_window()
         elif survey == 'TESS':
-            time, faint, bright = self._TESS_window()
+            time, faint, bright, waveform_type, waveform_params = self._TESS_window()
         elif survey == 'Rubin':
             raise NotImplementedError
         elif survey == 'ZTF':
-            time, faint, bright = self._ZTF_window()
+            time, faint, bright, waveform_type, waveform_params = self._ZTF_window()
         elif survey == 'ASAS-SN-V':
-            time, faint, bright = self._ASAS_SN_V_window()
+            time, faint, bright, waveform_type, waveform_params = self._ASAS_SN_V_window()
         elif survey == 'ASAS-SN-g':
-            time, faint, bright = self._ASAS_SN_g_window()
+            time, faint, bright, waveform_type, waveform_params = self._ASAS_SN_g_window()
         elif survey == 'GaiaDR3':
-            time, faint, bright = self._GaiaDR3_window()
+            time, faint, bright, waveform_type, waveform_params = self._GaiaDR3_window()
         elif survey == 'GaiaDR4':
-            time, faint, bright = self._GaiaDR4_window()
+            time, faint, bright, waveform_type, waveform_params = self._GaiaDR4_window()
         elif survey == 'GaiaDR4-geq20':
-            time, faint, bright = self._GaiaDR4_geq20_window()
+            time, faint, bright, waveform_type, waveform_params = self._GaiaDR4_geq20_window()
         elif survey == 'GaiaDR5':
-            time, faint, bright = self._GaiaDR5_window()
+            time, faint, bright, waveform_type, waveform_params = self._GaiaDR5_window()
         elif survey == 'AllWISE':
-            time, faint, bright = self._AllWISE_window()
+            time, faint, bright, waveform_type, waveform_params = self._AllWISE_window()
         elif survey == 'custom':
             raise NotImplementedError     
         # faint star model
@@ -1076,11 +1076,15 @@ class ObservationalWindow:
             self.ground_truth_faint = FoldedLightCurve(time=time,
                                         mag=mag_ground_to_obs_win + faint['mean_mag'],
                                         err=np.zeros(len(mag_ground_to_obs_win)),
-                                        timescale=timescale)
+                                        timescale=timescale,
+                                        waveform_type=waveform_type, 
+                                        waveform_params=waveform_params)
             self.ground_truth_bright = FoldedLightCurve(time=time,
                                         mag=mag_ground_to_obs_win + bright['mean_mag'],
                                         err=np.zeros(len(mag_ground_to_obs_win)),
-                                        timescale=timescale)            
+                                        timescale=timescale,
+                                        waveform_type=waveform_type, 
+                                        waveform_params=waveform_params)            
 
         else:
             mag_ground_to_obs_win = 0.
@@ -1093,11 +1097,15 @@ class ObservationalWindow:
         self.faint = FoldedLightCurve(time=time, 
                                       mag=mag_faint, 
                                       err=err_faint, 
-                                      timescale=timescale)
+                                      timescale=timescale, 
+                                        waveform_type=waveform_type, 
+                                        waveform_params=waveform_params)
         self.bright = FoldedLightCurve(time=time,
                                         mag=mag_bright,
                                         err=err_bright,
-                                        timescale=timescale)   
+                                        timescale=timescale,
+                                        waveform_type=waveform_type, 
+                                        waveform_params=waveform_params)   
 
 
 
@@ -1169,7 +1177,10 @@ class ObservationalWindow:
         bright = {'mean_mag': 10.0,
                 'noise_level': 0.0015}
         time = np.arange(0, timespan, cadence)
-        return time, faint, bright
+        waveform_type = "uneven_savgol"
+        waveform_params = {'window': round(.1*len(time)),
+                                                    'polynom': 3}
+        return time, faint, bright, waveform_type, waveform_params
 
     def _CoRoT_window(self):
         """ 
@@ -1185,7 +1196,10 @@ class ObservationalWindow:
         bright = {'mean_mag': 12.0,
                 'noise_level': 0.001}
         time = np.arange(0, timespan, cadence)
-        return time, faint, bright
+        waveform_type = "uneven_savgol"
+        waveform_params = {'window': round(.1*len(time)),
+                                                    'polynom': 3}
+        return time, faint, bright, waveform_type, waveform_params
     
     def _TESS_window(self):
         faint = {'mean_mag': 16.,
@@ -1193,7 +1207,10 @@ class ObservationalWindow:
         bright = {'mean_mag': 10.0,
                 'noise_level': 0.0003}
         time = self.read_observational_window('TESS')
-        return time, faint, bright
+        waveform_type = "uneven_savgol"
+        waveform_params = {'window': round(.1*len(time)),
+                                                    'polynom': 3}
+        return time, faint, bright, waveform_type, waveform_params
 
     def _Rubin_window(self):
         raise NotImplementedError
@@ -1204,7 +1221,10 @@ class ObservationalWindow:
         bright = {'mean_mag': 15.0,
                 'noise_level': 0.01}
         time = self.read_observational_window('ZTF')
-        return time, faint, bright
+        waveform_type = "uneven_savgol"
+        waveform_params = {'window': round(.25*len(time)),
+                                                    'polynom': 3}
+        return time, faint, bright, waveform_type, waveform_params
         
     def _ASAS_SN_V_window(self):
             # 'ASAS-SN-V':
@@ -1213,7 +1233,10 @@ class ObservationalWindow:
         bright = {'mean_mag': 12.0,
                 'noise_level': 0.02}
         time = self.read_observational_window('ASAS-SN-V')
-        return time, faint, bright
+        waveform_type = "uneven_savgol"
+        waveform_params = {'window': round(.25*len(time)),
+                                                    'polynom': 3}
+        return time, faint, bright, waveform_type, waveform_params
 
     def _ASAS_SN_g_window(self):
         # elif kwargs['survey_window'] == 'ASAS-SN-g':
@@ -1222,7 +1245,10 @@ class ObservationalWindow:
         bright = {'mean_mag': 12.0,
             'noise_level': 0.02}
         time = self.read_observational_window('ASAS-SN-g')
-        return time, faint, bright
+        waveform_type = "uneven_savgol"
+        waveform_params = {'window': round(.25*len(time)),
+                                                    'polynom': 3}
+        return time, faint, bright, waveform_type, waveform_params
     
     def _GaiaDR3_window(self):
             # elif kwargs['survey_window'] == 'GaiaDR3':
@@ -1231,7 +1257,10 @@ class ObservationalWindow:
         bright = {'mean_mag': 12.5,
                 'noise_level': 0.0008}
         time = self.read_observational_window('GaiaDR3')
-        return time, faint, bright
+        waveform_type = "uneven_savgol"
+        waveform_params = {'window': round(.25*len(time)),
+                                                    'polynom': 3}
+        return time, faint, bright, waveform_type, waveform_params
                 
     def _GaiaDR4_window(self):
         faint = {'mean_mag': 17.0,
@@ -1239,7 +1268,10 @@ class ObservationalWindow:
         bright = {'mean_mag': 12.5,
                   'noise_level': 0.0008}
         time = self.read_observational_window('GaiaDR4')
-        return time, faint, bright
+        waveform_type = "uneven_savgol"
+        waveform_params = {'window': round(.25*len(time)),
+                                                    'polynom': 3}
+        return time, faint, bright, waveform_type, waveform_params
              
     def _GaiaDR4_geq20_window(self):
         faint = {'mean_mag': 17.0,
@@ -1247,7 +1279,10 @@ class ObservationalWindow:
         bright = {'mean_mag': 12.5,
                 'noise_level': 0.008}
         time = self.read_observational_window('GaiaDR4-geq20')     
-        return time, faint, bright   
+        waveform_type = "uneven_savgol"
+        waveform_params = {'window': round(.25*len(time)),
+                                                    'polynom': 3}
+        return time, faint, bright, waveform_type, waveform_params
     
     def _GaiaDR5_window(self):        
             # elif kwargs['survey_window'] == 'GaiaDR5':
@@ -1256,7 +1291,10 @@ class ObservationalWindow:
         bright = {'mean_mag': 12.5,
                 'noise_level': 0.0008}
         time = self.read_observational_window('GaiaDR5')            
-        return time, faint, bright
+        waveform_type = "uneven_savgol"
+        waveform_params = {'window': round(.25*len(time)),
+                                                    'polynom': 3}
+        return time, faint, bright, waveform_type, waveform_params
     
     def _AllWISE_window(self):
         faint = {'mean_mag': 17.0,
@@ -1264,7 +1302,10 @@ class ObservationalWindow:
         bright = {'mean_mag': 12.5,
                 'noise_level': 0.0008}
         time = self.read_observational_window('AllWISE')
-        return time, faint, bright
+        waveform_type = "uneven_savgol"
+        waveform_params = {'window': round(.25*len(time)),
+                                                    'polynom': 3}
+        return time, faint, bright, waveform_type, waveform_params
     
     def __str__(self) -> str:
         return f"Observational window for {self.survey} survey"
