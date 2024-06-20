@@ -316,7 +316,28 @@ class FoldedLightCurve(LightCurve):
         
     def __str__(self):
         return f'A FoldedLightCurve instance has the following properties: {repr(self._list_properties())}'        
+
+    @classmethod
+    def suppress_warnings_globally(cls):
+        """
+        This is class method that enable to suppress warnings globally
+        for FoldedLightCurve instances.
         
+        usage:
+        FoldedLightCurve.suppress_warnings_globally()
+        """
+        print("Warning for FoldedLightCurves are not supressed")
+        cls._suppress_warnings = True
+
+    @classmethod
+    def enable_warnings_globally(cls):
+        """
+        This is a class method to enable
+        warnings globally for FoldedLightCurve instances.
+        Usage:
+        FoldedLightCurve.enable_warnings_globally()
+        """
+        cls._suppress_warnings = False        
 
 
 class SyntheticLightCurve:

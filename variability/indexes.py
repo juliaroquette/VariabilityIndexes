@@ -37,6 +37,7 @@ __TO DO__
 
 Last update: 02-02-2024
 """
+import inspect
 import numpy as np
 import scipy.stats as ss
 from warnings import warn
@@ -162,13 +163,6 @@ class VariabilityIndex:
                       (self.lc.mag[1:] - self.lc.mean))/np.sum(
                           (self.lc.mag - self.lc.mean)**2)
     
-    # @property
-    # def VonNeumann(self):
-    #     """
-    #     double check against the Gaia implementation 
-    #     """
-    #     return np.sum((self.lc.mag[1:] - self.lc.mag[:-1])/(self.lc.N - 1))/np.sum((self.lc.mag - 
-    #                                        self.lc.mean)/(self.lc.N - 1))
 
     @property
     def norm_ptp(self):
@@ -230,6 +224,38 @@ class VariabilityIndex:
             self.parent.lc._get_waveform()
             return (np.std(self.parent.lc.residual)**2 - np.mean(self.parent.lc.err_phased)**2)\
                 /(np.std(self.parent.lc.mag_phased)**2 - np.mean(self.parent.lc.err_phased)**2)
+
+    def _list_properties(self):
+        """
+        list properties of the class LightCurve
+        """
+        property_names = [name for name, value in inspect.getmembers(self.__class__, lambda o: isinstance(o, property))]
+        return property_names    
+        
+    def __str__(self):
+        return f'A VariabilityIndex instance has the following properties: {repr(self._list_properties())}'
+    
+    @classmethod
+    def suppress_warnings_globally(cls):
+        """
+        This is class method that enable to suppress warnings globally
+        for FoldedLightCurve instances.
+        
+        usage:
+        FoldedLightCurve.suppress_warnings_globally()
+        """
+        print("Warning for VariabilityIndex are not supressed")
+        cls._suppress_warnings = True
+
+    @classmethod
+    def enable_warnings_globally(cls):
+        """
+        This is a class method to enable
+        warnings globally for FoldedLightCurve instances.
+        Usage:
+        FoldedLightCurve.enable_warnings_globally()
+        """
+        cls._suppress_warnings = False       
 
 def gaia_AG_proxy(phot_g_mean_flux, phot_g_mean_flux_error, phot_g_n_obs):
     """
