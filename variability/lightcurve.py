@@ -213,9 +213,17 @@ class LightCurve:
         """
         return np.sqrt(np.sum((self.mag - self.mean)**2)/np.sum(self.err**2))
     
+    def _list_properties(self):
+        """
+        list properties of the class LightCurve
+        """
+        all_properties = dir(self)
+        # Filter out properties that start with an underscore
+        public_properties = [prop for prop in all_properties if not prop.startswith('_')]
+        return public_properties
+        
     def __str__(self):
-        list_of_properties = [prop for prop in dir(self) if not prop.startswith('_')]
-        return f'A LightCurve instance has the following properties: {repr(list_of_properties)}'
+        return f'A LightCurve instance has the following properties: {repr(self._list_properties())}'
 
 class FoldedLightCurve(LightCurve):
     """
@@ -289,6 +297,18 @@ class FoldedLightCurve(LightCurve):
                                              waveform_params=kwargs.get('waveform_params', self._waveform_params))
         # phasefolded lightcurves also have a residual curve between the waveform and the lightcurve
         self.residual = self.wf.residual_magnitude(self.waveform)
+        
+    def _list_properties(self):
+        """
+        list properties of the class LightCurve
+        """
+        all_properties = dir(self)
+        # Filter out properties that start with an underscore
+        public_properties = [prop for prop in all_properties if not prop.startswith('_')]
+        return public_properties
+        
+    def __str__(self):
+        return f'A FoldedLightCurve instance has the following properties: {repr(self._list_properties())}'        
         
 
 
