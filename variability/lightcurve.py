@@ -212,6 +212,10 @@ class LightCurve:
             float: Signal-to-noise ratio.
         """
         return np.sqrt(np.sum((self.mag - self.mean)**2)/np.sum(self.err**2))
+    
+    def __str__(self):
+        list_of_properties = [prop for prop in dir(self) if not prop.startswith('_')]
+        return f'A LightCurve instance has the following properties: {repr(list_of_properties)}'
 
 class FoldedLightCurve(LightCurve):
     """
@@ -247,8 +251,8 @@ class FoldedLightCurve(LightCurve):
         # define a WaveForm Object
         self.wf = WaveForm(self.phase, self.mag_phased)
         #  check if specific window parameters were passed as input
-        self._waveform_params = kwargs.get('waveform_params', {'window': round(.15*self.N),
-                                                    'polynom': 1})
+        self._waveform_params = kwargs.get('waveform_params', {'window': round(.25*self.N),
+                                                    'polynom': 3})
         # check if a specific waveform type was passed as input
         self._waveform_type = kwargs.get('waveform_type', 'uneven_savgol')
         self._get_waveform()
@@ -263,7 +267,6 @@ class FoldedLightCurve(LightCurve):
         self.mag_phased = self.mag[sort]       
         self.err_phased = self.err[sort]
         self.phase_number = phase_number[sort]
-        
         
     @property
     def timescale(self):
@@ -340,6 +343,12 @@ class SyntheticLightCurve:
                                             eclipse_duration=self.eclipse_duration,
                                             primary_eclipse_start=self.primary_eclipse_start)
             
+        elif model == "AATau":
+            self._model_name = model
+            self._mag = self.AATau(self._PTP_AMP, self._TIMESCALE,
+                                  dip_width=0.9, #in terms of phase
+                                  dip_start = 0.05    # Start time of the eclipse
+                                    )
         elif model == 'quasiperiodic':
             pass
         elif model == 'stochastic':
@@ -431,16 +440,158 @@ class SyntheticLightCurve:
         '''
         assert dip_width < 1, "Dip-width must be smaller than 1"
         # assert primary_eclipse_start + eclipse_duration < 0.5, "First eclipse must happen in the first half of the period"
-        phase =  (self._time - min(self._time))/period - np.floor((self._time - min(self._time))/period)
-        # generates amplitudes for each phase
-        n_phase = np.floor((self.time - min(self.time))/period)
         #
+        #
+        # make a base magnitude array
+        import random
+        def generate_random_numbers(n, x, y):
+            random_numbers = [random.uniform(x, y) for _ in range(n)]
+            return random_numbers        
+        mag = np.zeros_like(self._time)
+        ptp_A = np.zeros_like(self._time)
+        # generates amplitudes for each phase
+        n_phase = np.floor((self._time - min(self._time))/period) 
+        _n_phase = np.unique(n_phase)
+        _ptp_A = generate_random_numbers(len(_n_phase), 0.2*ptp_amp, 1.1*ptp_amp) 
+        for i, n in enumerate(_n_phase):
+            ptp_A[n_phase == n] = _ptp_A[i]
+
+        # calculate the phase for given period
+        phase =  (self._time - min(self._time))/period - np.floor((self._time-min(self._time))/period)
+        # define eclipse parameters
+        # select parts of the phased light-curve to be eclipsed
         dip_in = np.logical_and(phase >= dip_start, phase <= dip_start + dip_width)
-        phi_ = (phase[dip_in] - dip_start) * np.pi / dip_width
-        ptp_A = self.random_walk_1D(len(self.time), ptp_amp)
-        self.mag_AATau[dip_in] -= abs(ptp_A[dip_in]) * np.sin(phi_)
+        # Convert phase fraction to be eclipsed into appropriate radian values for the model
+        phi_ = (phase - dip_start) * np.pi / dip_width 
+        __ptp_A = self.Ornstein_Uhlenbeck(self._time, tau=4, sigma=0.02, mu=0)
+        # eclipse relevant parts of the light-curve
+        mag[dip_in] += ptp_A[dip_in]  * \
+            np.sin(phi_[dip_in])
+        mag += __ptp_A
+        return mag
     
     
+    @staticmethod
+    def random_walk_1D(n_steps, 
+                       ptp=1., # final peak-to-peak amplitude of the random walk
+                       type_of_step='normal', # normal, unit, skewed-normal
+                       skewness=5., # if using skewed-normal, this is the skewness parameter, 
+                                   # it can be any real number (positive for dipper)
+                        std = None
+                       ):
+        """
+        Perform a 1-dimensional random walk.
+
+        Parameters:
+        - n_steps (int): The number of steps in the random walk 
+                        (or the number of observations in the light-curve).
+        - ptp (float): The desired peak-to-peak amplitude for the light-curve.
+                       This is used to rescale the generated random walk ptp. 
+
+        Returns:
+        - positions (ndarray): The positions after each step of the random walk,
+                               scaled to the desired peak-to-peak amplitude.
+
+        References:
+        - Random Walk: https://en.wikipedia.org/wiki/Random_walk
+        """
+        if std is None:
+            std = 1/3.
+        if type_of_step == 'normal':
+            steps = np.random.normal(loc=0, scale=std, size=n_steps)
+        elif type_of_step == 'unit':
+            steps = np.random.choice([-1, 1], size=n_steps)
+        elif type_of_step == 'skewed-normal':
+            steps = ss.skewnorm.rvs(loc=0, scale=std, a=skewness, size=n_steps)
+        else:
+            raise ValueError('Invalid type of step, possible values are: normal, unit, skewed-normal')
+        
+        positions = np.cumsum(steps)
+        tail = round(0.05 * len(positions)) 
+        ptp_0 = np.median(np.sort(positions)[-tail:]) - np.median(np.sort(positions)[:tail])
+        return (positions - np.median(np.sort(positions)[-tail:])) * (ptp / ptp_0)
+
+ 
+    @staticmethod
+    def Ornstein_Uhlenbeck(time,
+                          tau=10.,
+                          mu=15,
+                           sigma=0.1 
+                           ):
+        """
+        Implements a mean-reverting stochastic process.
+        
+        Ornstein-Uhlenbeck process (OU process):
+        https://en.wikipedia.org/wiki/Ornstein%E2%80%93Uhlenbeck_process
+        
+        OU-process stochastic differential equation:
+        -> dXt = theta * (mu - Xt) dt + sigma * dWt
+        where:
+        - Xt is the state of the process at time t
+        - theta is the "rate of mean reversion" 
+        - mu is the mean value of the process
+        - sigma is the volatility of the process
+        - Wt is a Wiener process (Brownian motion)
+        
+        In this data-science ebook Chapter 13, section 4:
+        https://github.com/ipython-books/cookbook-2nd/
+        I found a version of this equation that is parametrised as a function
+        of a time-scale tau, rather than theta, which can be interpreted as 
+        the mean time-reverting tendency of the process. 
+        For this, we can use the relationship:
+        -> theta = 1/tau
+        -> sigma = sigma_ * sqrt(2/tau)
+        
+        This can be solved using the Euler-Maruyama solution:
+        https://en.wikipedia.org/wiki/Euler%E2%80%93Maruyama_method
+        
+        for a stochastic differential equation:
+            -> dXt = a(Xt, t) * dt + b(Xt, t) * dWt
+        with initial condition X0 = x0, the approximation to the solution X is
+        a Markov chain {Xt} with time increment dt:
+            1-> dt = T/N for an evenly spaced interval [0, T]. Although here 
+                I am inputing the time array, so I am using the time array to 
+                calculate dt
+            2-> X0 = mu 
+                I am imposing that the initial condition is actually the mean
+                of the process
+            3-> for i = 1, 2, ..., N:
+                X[n+1] = X[n] + a(X[n], t[n]) * dt + b(X[n], t[n]) * dW[n]
+                where dW[n] = W[n+1] - W[n] ~ N(0, dt) (Normal distributed 
+                                                with mean 0 and variance dt)
+        Translating this to the modified version of the OU-process:
+            -> a(X[n], t) =  (mu - X[n]) / tau
+            -> b(X[n], t) = sigma * sqrt(2/tau)
+            -> dW[n] = W[n+1] - W[n] ~ N(0, dt)
+        
+        
+        """
+        dt =  512./60./60/24./2 # the default cadence is half of the CoRoT cadence.
+        N = int((max(time) - min(time))/dt)        
+        mag = np.full(N, mu, dtype=float) #I am imposing that the initial condition is actually de mean of the process
+        _time = np.linspace(min(time), max(time), N)
+        
+        def a_Xnt(tau,
+                  mag,
+                  mu):
+            return (mu - mag) / tau
+        
+        def b_Xnt(sigma, tau):
+            return sigma * np.sqrt(2/tau)
+        
+        def dW(dt_):
+            """
+            Implementing dW like that guarantees that dW is calculate for the
+            current dt. This makes sure the correct variance properties are kept.
+            """
+            return np.random.normal(loc=0, scale=np.sqrt(dt_))
+        
+        for i in range(N - 1):
+            mag[i + 1] = mag[i] + a_Xnt(tau, mag[i],  mu) * dt + b_Xnt(sigma, tau) * dW(dt)
+        
+        
+        return np.interp(time, _time, mag)
+   
  
     
 class SyntheticLightCurve_:
@@ -759,6 +910,7 @@ class SyntheticLightCurve_:
         phi_ = (phase[dip_in] - dip_start) * np.pi / dip_width
         ptp_A = self.random_walk_1D(len(self.time), ptp_amp)
         self.mag_AATau[dip_in] -= abs(ptp_A[dip_in]) * np.sin(phi_)
+
     
     def resample_from_lc(t_in, y_in, t_out):
         """
