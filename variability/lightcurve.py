@@ -14,6 +14,7 @@ Define a class/function that generates a sample of light-curves
 import numpy as np
 import scipy.stats as ss
 import pandas as pd
+import inspect
 import warnings
 np.random.seed(42)
 from variability.filtering import WaveForm
@@ -217,10 +218,8 @@ class LightCurve:
         """
         list properties of the class LightCurve
         """
-        all_properties = dir(self)
-        # Filter out properties that start with an underscore
-        public_properties = [prop for prop in all_properties if not prop.startswith('_')]
-        return public_properties
+        property_names = [name for name, value in inspect.getmembers(self.__class__, lambda o: isinstance(o, property))]
+        return property_names    
         
     def __str__(self):
         return f'A LightCurve instance has the following properties: {repr(self._list_properties())}'
@@ -243,13 +242,13 @@ class FoldedLightCurve(LightCurve):
         
         # FlodedLightCurve needs a timescale
         if timescale is not None:
-            self._timescale = timescale
+            self._timescale = timescale            
         else:
             from variability.timescales import TimeScale
             ts = TimeScale(lc=self)
             frequency_highest_peak, power_highest_peak, FAP_highest_peak = ts.get_LSP_period(periodogram=False)
             self._timescale = 1./frequency_highest_peak
-            self.timescale_FAP = FAP_highest_peak*100
+            self._timescale_FAP = FAP_highest_peak*100
             warnings.warn("Automatic timescale estimated from LSP - FAP: {0}".format(self.timescale_FAP))
 
         # phasefold lightcurve to a given timescale
@@ -278,7 +277,7 @@ class FoldedLightCurve(LightCurve):
         
     @property
     def timescale(self):
-        return self._timescale
+        return self._timescale    
     
     @timescale.setter
     def timescale(self, new_timescale):
@@ -290,22 +289,30 @@ class FoldedLightCurve(LightCurve):
             self.wf = WaveForm(self.phase, self.mag_phased)
             self._get_waveform()
         else:
-            raise ValueError("Please enter a valid _positive_ timescale")        
+            raise ValueError("Please enter a valid _positive_ timescale")  
+    
+    @property
+    def timescale_FAP(self):
+        """
+        False Alarm Probability for the timescale estimated from the Lomb-Scargle periodogram. It is None if timescale was input by the user.
+        """
+        if hasattr(self, '_timescale_FAP') and self._timescale_FAP is not None:
+            return self._timescale_FAP
+        else:
+            return None              
         
     def _get_waveform(self, **kwargs):
         self.waveform = self.wf.get_waveform(waveform_type= kwargs.get('waveform_type', self._waveform_type), 
                                              waveform_params=kwargs.get('waveform_params', self._waveform_params))
         # phasefolded lightcurves also have a residual curve between the waveform and the lightcurve
         self.residual = self.wf.residual_magnitude(self.waveform)
-        
+    
     def _list_properties(self):
         """
         list properties of the class LightCurve
         """
-        all_properties = dir(self)
-        # Filter out properties that start with an underscore
-        public_properties = [prop for prop in all_properties if not prop.startswith('_')]
-        return public_properties
+        property_names = [name for name, value in inspect.getmembers(self.__class__, lambda o: isinstance(o, property))]
+        return property_names    
         
     def __str__(self):
         return f'A FoldedLightCurve instance has the following properties: {repr(self._list_properties())}'        
