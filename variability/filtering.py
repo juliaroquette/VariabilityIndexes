@@ -274,10 +274,10 @@ class WaveForm:
             kernel = waveform_params.get('kernel', 4.)
             waveform = self.waveform_H22(kernel=kernel)
         elif waveform_type == 'uneven_savgol':
-            window = waveform_params.get('window', round(0.25*self.N))
+            window = waveform_params.get('window', round(0.15*self.N))
             if window % 2 == 0:
                 window += 1
-            polynom = waveform_params.get('polynom', 3)
+            polynom = waveform_params.get('polynom', 1)
             while polynom >= window:
                 window += 2
             waveform = self.uneven_savgol(window, polynom)

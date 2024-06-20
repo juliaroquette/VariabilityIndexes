@@ -220,7 +220,7 @@ class VariabilityIndex:
            
         @property
         def value(self):
-            print(self._waveform_type)
+            # print(self._waveform_type)
             self.parent.lc._get_waveform()
             return (np.std(self.parent.lc.residual)**2 - np.mean(self.parent.lc.err_phased)**2)\
                 /(np.std(self.parent.lc.mag_phased)**2 - np.mean(self.parent.lc.err_phased)**2)
@@ -244,7 +244,6 @@ class VariabilityIndex:
         usage:
         FoldedLightCurve.suppress_warnings_globally()
         """
-        print("Warning for VariabilityIndex are not supressed")
         cls._suppress_warnings = True
 
     @classmethod

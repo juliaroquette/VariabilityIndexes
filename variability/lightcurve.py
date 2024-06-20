@@ -326,7 +326,6 @@ class FoldedLightCurve(LightCurve):
         usage:
         FoldedLightCurve.suppress_warnings_globally()
         """
-        print("Warning for FoldedLightCurves are not supressed")
         cls._suppress_warnings = True
 
     @classmethod
