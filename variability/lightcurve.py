@@ -242,14 +242,27 @@ class FoldedLightCurve(LightCurve):
         
         # FlodedLightCurve needs a timescale
         if timescale is not None:
-            self._timescale = timescale            
+            self._timescale = timescale
+            self.timescale_type = 'user_defined'      
         else:
             from variability.timescales import TimeScale
             ts = TimeScale(lc=self)
             frequency_highest_peak, power_highest_peak, FAP_highest_peak = ts.get_LSP_period(periodogram=False)
             self._timescale = 1./frequency_highest_peak
-            self._timescale_FAP = FAP_highest_peak*100
-            warnings.warn("Automatic timescale estimated from LSP - FAP: {0}".format(self.timescale_FAP))
+            self._power_highest_peak = power_highest_peak
+            self._timescale_FAP = FAP_highest_peak
+            # include SF:
+            use_SF = kwargs.get('use_SF', False)
+            if bool(use_SF) & (self._power_highest_peak < ts.FAP_level[-1]):
+                print('using SF')
+                #if FAP is not good enough, try SF:
+                self._timescale = ts.get_structure_function_timescale()
+                self.timescale_type = 'SF'
+                self._power_highest_peak = None
+                self._timescale_FAP = None
+            else:
+                self.timescale_type = 'LSP'
+            # warnings.warn("Automatic timescale estimated from LSP - FAP: {0}".format(self.timescale_FAP))
 
         # phasefold lightcurve to a given timescale
         self._get_phased_values()        
