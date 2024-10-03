@@ -3,5 +3,6 @@ testing_class.ipynb
 *.pyc
 data/raw
 *.DS_Store*
-"[dev]"*
+\[dev\]*.ipynb
+*\[_tests_\]*.ipynb
 *.png
