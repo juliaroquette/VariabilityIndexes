@@ -1,13 +1,23 @@
 """
 Module for computing variability timescales.
 
-@juliaroquette: At the moment
+@juliaroquette:
+
+
+TODO: 
+- Modify LSP to use least-squares fitting to get the best period
+- Debug SAVGOL
+- Can I make an version of savgol where the window runs as a function of phase?
+
 """
 
 import numpy as np
 from astropy.timeseries import LombScargle
 from scipy.signal import find_peaks
+from scipy.optimize import minimize
+from iminuit import Minuit
 import warnings
+import matplotlib.pyplot as plt
 
 
 class TimeScale:
@@ -58,12 +68,12 @@ class TimeScale:
                                         minimum_frequency=fmin,
                                         maximum_frequency=fmax) 
         # get False alarm probability levels
-        FAP_level = ls.false_alarm_level(fap_prob, method='baluev', 
+        self.FAP_level = ls.false_alarm_level(fap_prob, method='baluev', 
                                          minimum_frequency=fmin, 
                                          maximum_frequency=fmax, 
                                          samples_per_peak=osf)
         if bool(periodogram):
-            return frequency, power, FAP_level
+            return frequency, power, self.FAP_level
         else:
             highest_peak = power[np.argmax(power)]
             FAP_highest_peak = ls.false_alarm_probability(power.max(),method='baluev', 
@@ -79,6 +89,7 @@ class TimeScale:
         sf = StructureFunction(self.lc.time, self.lc.mag, self.lc.err)
         sf.structure_function_slow()
         print('SF timescale:', sf.find_timescale())
+        return sf.find_timescale()
     
     def get_MSE_timescale(self):
         pass
@@ -89,9 +100,9 @@ class TimeScale:
 
 class StructureFunction:
     '''
-    This package computes the Structure function as implemented by 
-    Sergison+19 and Venuti+21, in order to apply it to GaiaDR3 data
+    Class for computing the structure function of a light curve.
     Author: @ChloeMas
+    Adapted to object-oriented by @juliaroquette
     '''    
     ###################################
     # Structure function
@@ -99,14 +110,15 @@ class StructureFunction:
         self.mag = mag
         self.time = time
         self.err = np.mean(err)        
-        self.num_bins = kwargs.get('num_bins', 100)
-        self.epsilon = kwargs.get('epsilon', 4)
-        self.thresh = kwargs.get('thresh', 75)
+        self.num_bins = kwargs.get('num_bins', 120)
+        self.epsilon = kwargs.get('epsilon', 5)
+        # self.thresh = kwargs.get('thresh', 80)
 
         
 
     def structure_function_slow(self) :
         """
+        
         Calculates the structure function of a magnitude time series using a slow method.
 
         Args:
@@ -123,142 +135,148 @@ class StructureFunction:
 
         
         # Create logarithmically spaced time bins
-        log_bins  = np.logspace(np.log10(tmin), np.log10(tmax), num=self.num_bins + 1, endpoint=True, base=10.0)
-        time_bins = (log_bins[:-1] + log_bins[1:]) / 2.0
-    
+        log_bins  = np.logspace(np.log10(tmin), np.log10(tmax),\
+            num=self.num_bins + 1, endpoint=True, base=10.0)
+        self.time_bins = (log_bins[:-1] + log_bins[1:]) / 2.0
+        # Ensure no zero time difference
+        p = 10
+        while tmin == 0:
+            tmin = np.percentile(np.diff(self.time), p)
+            p += 2    
 
-        sf       = np.zeros(len(time_bins))
-        it_list  = []
+    # Create logarithmically spaced time bins
+        log_bins = np.logspace(np.log10(tmin), np.log10(tmax),\
+            num=self.num_bins + 1)
+        self.time_bins = (log_bins[:-1] + log_bins[1:]) / 2.0
 
-        #Compute all time lags, corresponding delta_mags
-        delta_t_  = []
-        delta_mag = []
+        # Compute all time lags and corresponding delta magnitudes
+        delta_t = np.abs(self.time[:, None] - self.time)
+        delta_mag = (self.mag[:, None] - self.mag)**2
+        delta_err = (self.err[:, None] - self.err)**2
+        # Only upper triangular part
+        delta_t = delta_t[np.triu_indices(len(self.time), 1)]  
+        delta_mag = delta_mag[np.triu_indices(len(self.time), 1)]
+        delta_err = delta_err[np.triu_indices(len(self.time), 1)]
 
-        for i in range(len(self.time)):
-            for j in range(i+1, len(self.time)):
-                dt = abs(self.time[i] - self.time[j])
-                delta_t_.append(dt)
-                delta_mag.append((self.mag[i] - self.mag[j])**2)
+        # Sort by time lag
+        sort_indices = np.argsort(delta_t)
+        delta_t, delta_mag = delta_t[sort_indices], delta_mag[sort_indices]
+        delta_err = delta_err[sort_indices]
+
+        # Initialize structure function array and pair counts
+        self.sf = np.full(len(self.time_bins), np.nan)
+        it_list = []
+
+        # Adjust time bins to have at least epsilon pairs per time bin
+        for i, time_bin in enumerate(self.time_bins):
+            bin_diff = abs(time_bin - log_bins[i:i+2])
+            lags_ind = np.where((delta_t > time_bin - bin_diff[0]) & (delta_t < time_bin + bin_diff[1]))[0]
+
+            while len(lags_ind) < self.epsilon and len(lags_ind) > 0:
+                bin_diff *= 0.95  # Narrow bin window
+                lags_ind  = np.where((delta_t > time_bin - bin_diff[0]) & (delta_t < time_bin + bin_diff[1]))[0]
+
+            if len(lags_ind) > 0:
+                self.sf[i] = np.mean(delta_mag[lags_ind]) #- 2*np.mean(delta_err[lags_ind])**2
             
-        delta_t_  = np.array(delta_t_)
-        delta_mag = np.array(delta_mag)
-        
-        sort      = np.argsort(delta_t_)
-        delta_t_, delta_mag = delta_t_[sort], delta_mag[sort]
-
-        
-        #Loop to adjust the time bins to have at least epsilon pairs per time bin :
-        for i, time_bin in enumerate(time_bins) :
-            
-            bin_diff_d = abs(time_bin - log_bins[i])
-            bin_diff_u = abs(time_bin - log_bins[i+1])
-
-            lags_ind   = np.where((delta_t_>time_bin-bin_diff_d) & (delta_t_<time_bin+bin_diff_u))[0]
-            
-            while len(lags_ind) < self.epsilon :
-            
-                if len(lags_ind) == 0 :
-                    break 
-                    
-                bin_diff_d += 0.05*bin_diff_d
-                bin_diff_u += 0.05*bin_diff_d
-            
-                lags_ind    = np.where((delta_t_>time_bin-bin_diff_d) & (delta_t_<time_bin+bin_diff_u))[0]
-                
-            if len(lags_ind)>0 :
-                sf[i] = 1/len(lags_ind) * sum(delta_mag[lags_ind])
-
-            else :
-                sf[i] = np.nan
-                
             it_list.append(len(lags_ind))
 
-        #Remove nan
-        sel                     = ~np.isnan(sf)
-        self.SF = sf[sel]
-        self.time_lag = np.array(time_bins)[sel]
-        self.N_bin = np.array(it_list)[sel]
+        # Remove NaN values and return the results
+        valid_idx = ~np.isnan(self.sf)
+        self.sf, self.time_bins = self.sf[valid_idx], self.time_bins[valid_idx]
+        self.it_list = np.array(it_list)[valid_idx]    
     
     
+    def model_function(x, t0, C0, C1, beta):
+        return C1 * (1 - np.exp(-(x / t0))**beta) + C0
+
+    
+    def chi_squared(x, y, t0, C0, C1, beta):
+        model = model_function(x, t0, C0, C1, beta)
+        return (np.sum((y - model) ** 2/np.std(y)**2))
+
+    def log_chi_squared(x, y, t0, C0, C1, beta):
+        model     = model_function(x, t0, C0, C1, beta)
+        log_y     = np.log10(y)
+        log_model = np.log10(model)
+        return np.sum((log_y - log_model) ** 2 / np.std(log_y) ** 2)    
     ################################################
     #Derive timescale    
         
-    def find_timescale(self):
+    ########################################
+    # Minuit Fit Function in Log Space
+    def fit_with_minuit(self, last_params=None):
 
+        if last_params is None:
+            last_params = [1.0, 0.1, 0.1, 1.0]  # Initial guesses for parameters
+
+        # Define a wrapped function for Minuit that only takes the parameters to be optimized
+        def chi2_for_minuit(t0, C0, C1, beta):
+            return log_chi_squared(self.time_bins, sf, t0, C0, C1, beta)
+
+        # Initialize Minuit
+        m = Minuit(chi2_for_minuit, t0=last_params[0], C0=last_params[1], C1=last_params[2], beta=last_params[3])
+        m.errordef = 1  # For least squares fitting
+        #m.limits = [(1e-6, max(time_bins)), (1e-6, np.percentile(sf, 20)), 
+        #          (np.percentile(sf, 35), np.percentile(sf, 85)), (0.85, 1.15)]
+        m.limits = [(0.07, max(self.time_bins)), (1e-5, 0.07), (1e-3, 5.5), (1, 1)]
+                
+        m.fixed["beta"] = True
+        
+        # Perform the minimization
+        m.migrad()
+
+        # Extract the fit results
+        t0_fit, C0_fit, C1_fit, beta_fit = m.values
+        fit_errors = m.errors
+        chi2_min   = m.fval  # Get the minimum chi-squared value
+        y_fit      = model_function(self.time_bins, t0_fit, C0_fit, C1_fit, beta_fit)
+
+        return y_fit, (t0_fit, C0_fit, C1_fit, beta_fit), fit_errors, chi2_min
+
+    #######################################
+    # Main Function to Derive Timescale Using Log Space
+    def find_timescale(sf, time_bins, threshold=1e-5, last_params=None, method='curve_fit', plot=False):
         """
-        Finds the characteristic timescale of a time-series from the Structure Function.
-
-    #     Args:
-    #         - sf, self.time_lag (ndarray): Structure function and log time bins (structure function must be in mag**2)
-    #         - err (float):         Error threshold. Defaults to 0.01. Used to define the noise-dominated regime of the sf
-    #         - thresh (int):        Thresh_th percentile is used for a first approximation of tau_peak (timescale where most variability occurs). Default is Q3           
-
-    #     Returns:
-    #         - ts_sf (float):       The characteristic timescale. For a periodic time series, should be 1/2 the period
-    #         - dict_fit (dict):     Fitting parameters for each regime of the SF
-    #         - flag(bool):          True is no ts was retrieved with the code (in which case ts_sf will be NaN)
-    #     """
+        Derive the timescale from the structure function fit using the specified method in log space.
         
-        #Divide the SF into 3 regimes
-        taus = [min(self.time_lag),\
-                self.time_lag[np.where(self.SF >= 2 * self.err**2)[0][0]],\
-                self.time_lag[np.where(self.SF >= np.percentile(self.SF, self.thresh))[0][0]],\
-                max(self.time_lag)]
+        Args:
+            sf (ndarray): Structure function values.
+            time_bins (ndarray): Corresponding time bins.
+            threshold (float, optional): Gradient threshold to determine the timescale.
+            last_params (list, optional): Initial parameters for fitting.
+            method (str): Fitting method ('curve_fit' or 'minuit').
+            plot (bool, optional): Whether to plot the structure function and fit results.
 
-        sfs, ts = zip(*[(self.SF[(self.time_lag >= taus[i]) & (self.time_lag <= taus[i+1])],\
-              self.time_lag[(self.time_lag >= taus[i]) & (self.time_lag <= taus[i+1])]) for i in range(len(taus)-1)])
+        Returns:
+            ts (float): Derived timescale.
+            y_fit (ndarray): Fitted structure function values.
+            params (list): Best-fit parameters [t0, C0, C1, beta].
+            fit_errors (list or None): Uncertainties for the fit parameters if available.
+        """
+        if method == 'curve_fit':
+            y_fit, params, fit_errors = fit_with_curve_fit(sf, time_bins, last_params)
+        elif method == 'minuit':
+            y_fit, params, fit_errors, chi2 = fit_with_minuit(sf, time_bins, last_params)
+        elif method == 'minimize_chi2':
+            y_fit, params, fit_errors, chi2 = fit_with_minimize_chi2(sf, time_bins, last_params)
+        else:
+            raise ValueError("Method must be either 'curve_fit' or 'minuit'.")
 
-        #Fit each regime with a line in log-space
-        dict_fit = {}
+        t0_fit, C0_fit, C1_fit, beta = params
+        ts = min(t0_fit, max(time_bins))
 
-        for i, (ts_i, sf_i) in enumerate(zip(ts, sfs)):
+        # Plot the structure function and fit results if requested
+        if plot:
+            plt.figure(figsize=(8, 5))
+            plt.loglog(time_bins, sf, 'o', label="Structure Function")
+            plt.loglog(time_bins, y_fit, '-', label="Fitted Model")
+            plt.axvline(ts, color="red", linestyle="--", label=f"Timescale (t0): {ts:.2f}")
+            plt.xlabel("Time Bins (log scale)")
+            plt.ylabel("Structure Function")
+            plt.legend()
+            # plt.show()
+
+        return ts, y_fit, params, fit_errors  # Return timescale, fit, params, and uncertainties
+
         
-            if len(ts_i) > 3 : #Considering it needs at least 3 points to fit a line
-                
-                xp   = np.log10(np.linspace(0.9*min(ts[i]), 2*max(ts[i]), 600))
-                x, y = np.log10(ts[i]), np.log10(sfs[i])
-                f    = np.poly1d(np.polyfit(x, y, 1))
-                yp   = 10**f(xp)
-                xp   = 10**xp
-
-                dict_fit[f't_{i}'], dict_fit[f'sf_{i}'], dict_fit[f'f_{i}'] = xp, yp, f
-                
-            elif len(ts_i) > 0 and 0 < i < 3:
-                
-                ts_i = np.concatenate([ts_i, ts[i+1]])
-                sf_i = np.concatenate([sf_i, sfs[i+1]])
-                
-                xp   = np.log10(np.linspace(0.9*min(ts[i]), 2*max(ts[i]), 600))
-                x, y = np.log10(ts[i]), np.log10(sfs[i])
-                f    = np.poly1d(np.polyfit(x, y, 1))
-                yp   = 10**f(xp)
-                xp   = 10**xp
-
-                dict_fit[f't_{i}'], dict_fit[f'sf_{i}'], dict_fit[f'f_{i}'] = xp, yp, f
-                    
-        f_1, f_2 = dict_fit['f_1'], dict_fit['f_2']
-        a1, b1   = f_1[1], f_1[0]
-        a2, b2   = f_2[1], f_2[0]
-
-        # Find the crossing point between 2nd and 3rd regime in log scale
-        log_x12 = (b2 - b1) / (a1 - a2)
-
-        # Transform log_x12 back to linear scale
-        tau_eq  = 10**log_x12
-    
-    
-        #Find the first peak after the crossing point (which should correspond to tau_peak)
-        peaks   = find_peaks(self.SF)[0]
-        t_peaks = self.time_lag[peaks]
-        sel     = np.where((t_peaks >= tau_eq))[0]
-        peaks   = t_peaks[sel]
-        flag    = False
-        
-        if len(peaks) > 0 :
-            ts_sf   = peaks[0]
-        else :
-            print('no ts found')
-            ts_sf = np.nan
-            flag  = True                
-        self.dict_fit = dict_fit
-        return 2.*ts_sf
