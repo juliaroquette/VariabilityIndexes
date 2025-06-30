@@ -20,6 +20,7 @@ __This currently includes__
 - mad
 - Q_index
 
+-> Add:
 - gaia_AG_proxy
 
 - double check against the Gaia implementation 
@@ -33,6 +34,9 @@ __ Under implementation __
 __TO DO__
 - Add documenation to each method
 - Add references 
+- Add Saunders
+- Add SL
+- Add periodic/aperiodic timescales as an index?
 
 
 Last update: 02-02-2024
