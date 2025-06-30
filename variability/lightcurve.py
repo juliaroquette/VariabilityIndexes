@@ -4,7 +4,8 @@ Base class for reading light curves
 @juliaroquette:
 Defines a base class for reading light curves, which can be inherited by other classes that analyse it.
 
-Last update: 31 January 2024 
+Last update:  30 June 2025
+previous update: 31 January 2024 
 
 TO DO:
 Define a multi-wavelength light curve class
@@ -69,6 +70,14 @@ class LightCurve:
         self.time = np.asarray(time, dtype=float)[mask]
         self.mag = np.asarray(mag, dtype=float)[mask]
         self.err = np.asarray(err, dtype=float)[mask]
+        #
+        # makes sure light curves are sorted by time
+        #
+        sorted_indices = np.argsort(self.time)
+        self.time = self.time[sorted_indices]
+        self.mag = self.mag[sorted_indices]
+        self.err = self.err[sorted_indices]        
+        # keyword specifying if we are working in flux (relevant for M-index calculation)
         self.is_flux = is_flux
 
     @property    
@@ -239,7 +248,6 @@ class FoldedLightCurve(LightCurve):
             super().__init__(kwargs['time'], kwargs['mag'], kwargs['err'], kwargs.get('mask', None))
         else:
             raise ValueError("Either a LightCurve object or time, mag and err arrays must be provided")
-        
         # FlodedLightCurve needs a timescale
         if timescale is not None:
             self._timescale = timescale
