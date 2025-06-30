@@ -6,3 +6,4 @@ data/raw
 \[dev\]*.ipynb
 *\[_tests_\]*.ipynb
 *.png
+*.csv
