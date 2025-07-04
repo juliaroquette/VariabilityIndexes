@@ -108,7 +108,10 @@ class LightCurve:
         Returns:
             float: Standard deviation.
         """
-        return np.std(self.mag)
+        return np.std(self.mag,
+                      # ddof=1 makes sure std is bias-corrects 
+                      # this means N-1 is used as the denominator rather than N 
+                      ddof=1) 
 
     @property
     def mean(self):
