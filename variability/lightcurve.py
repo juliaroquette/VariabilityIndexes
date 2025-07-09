@@ -8,6 +8,8 @@ Last update:  30 June 2025
 previous update: 31 January 2024 
 
 TO DO:
+- Add reference time to fase folding
+- review waveform derivation
 Define a multi-wavelength light curve class
 Define a class/function that generates a sample of light-curves
 """
@@ -274,7 +276,7 @@ class FoldedLightCurve(LightCurve):
             else:
                 self.timescale_type = 'LSP'
             # warnings.warn("Automatic timescale estimated from LSP - FAP: {0}".format(self.timescale_FAP))
-
+        self._reference_time = kwargs.get('reference_time', 0.)
         # phasefold lightcurve to a given timescale
         self._get_phased_values()        
                 
@@ -289,8 +291,10 @@ class FoldedLightCurve(LightCurve):
         self._get_waveform()
 
     def _get_phased_values(self):
+        # _reference_time adds an offset to the phase 
+        # this may be useful to align phases to a specific event. 
         # Calculate the phase values
-        phase = np.mod(self.time, self._timescale) / self._timescale
+        phase = np.mod(self.time - self._reference_time, self._timescale) / self._timescale
         # Sort the phase and magnitude arrays based on phase values
         phase_number = np.floor(self.time/self._timescale)
         sort = np.argsort(phase)
