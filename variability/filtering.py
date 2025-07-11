@@ -169,15 +169,10 @@ class WaveForm:
         Raises:
         - TypeError: If folded_lc is not an instance of FoldedLightCurve.
         """
-        # if not isinstance(folded_lc, FoldedLightCurve):
-            # raise TypeError("lc must be an instance of LightCurve")
-        # else:
-            # self._lc = folded_lc
         self.phase = phase
         self.mag_phased = mag_phased
         self.N = len(self.mag_phased)
 
-  
     def circular_rolling_average_number(self, window_size=5):
         """
         Calculate the circular rolling average of the folded light curve.
@@ -210,7 +205,6 @@ class WaveForm:
         
     def savgol(self, window=10, polynom=3):
         return sp.signal.savgol_filter(self.mag_phased, window, polynom)
-    
 
     def circular_rolling_average_phase(self, wd_phase=0.1):
         """
