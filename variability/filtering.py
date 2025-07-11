@@ -71,7 +71,7 @@ class Filtering:
         The default tolerance check if less than 0.01% of t
         """
         dt = self.lc.time[1:] - self.lc.time[:-1]
-        num_outliers = len(np.where(abs(dt - np.mean(dt)) > 3*np.std(dt))[0])
+        num_outliers = len(np.where(abs(dt - np.mean(dt)) > 3*np.std(dt, ddof=1))[0])
         return bool(num_outliers < (tolerance/100.)*len(self.lc.time))
 
     #masking
@@ -188,16 +188,25 @@ class WaveForm:
         Returns:
         - np.array: The circular rolling average waveform.
         """
+        # makes sure it won't break with weird sizes of lc
+        if not isinstance(window_size, int):
+            raise TypeError("window_size must be an integer")
+        if window_size <= 0 or window_size >= self.N:
+            raise ValueError("window_size must be > 0 and smaller than the data length")
+        if window_size % 2 == 0:
+            raise ValueError('The "window" must be an odd integer')
+
+        #
+        half_window = window_size //2
+        # to deal with edges, I am assuming phased light curves are circular
         extended_mag = np.concatenate((self.mag_phased, self.mag_phased, self.mag_phased))
+        #
         extended_waveform = np.array([
-            np.mean(extended_mag[i - int(0.5 * window_size):
-                i + int(np.round((0.5 * window_size)))])\
-                    for i in np.arange(int(0.5 * window_size),\
-                        len(extended_mag) -\
-                            int(np.round(0.5*window_size + 1)))])
+            np.mean(extended_mag[i - half_window : i + half_window + 1])\
+                    for i in np.arange(half_window, 
+                                       len(extended_mag) - half_window)])
         
-        return extended_waveform[self.N - int(0.5 * window_size):
-            2 * self.N - int(0.5 * window_size)]
+        return extended_waveform[self.N - half_window: 2 * self.N - half_window]
         
     def savgol(self, window=10, polynom=3):
         return sp.signal.savgol_filter(self.mag_phased, window, polynom)
@@ -235,7 +244,7 @@ class WaveForm:
         return smooth_mag
 
     def waveform_Cody(self, n_point=50):
-        return sp.ndimage.filters.median_filter(self.mag_phased, size=n_point, mode='wrap')   
+        return sp.ndimage.median_filter(self.mag_phased, size=n_point, mode='wrap')   
     
     def uneven_savgol(self, window, polynom):
         """
@@ -274,7 +283,7 @@ class WaveForm:
             kernel = waveform_params.get('kernel', 4.)
             waveform = self.waveform_H22(kernel=kernel)
         elif waveform_type == 'uneven_savgol':
-            window = waveform_params.get('window', round(0.15*self.N))
+            window = waveform_params.get('window', round(0.25*self.N))
             if window % 2 == 0:
                 window += 1
             polynom = waveform_params.get('polynom', 1)
@@ -282,7 +291,7 @@ class WaveForm:
                 window += 2
             waveform = self.uneven_savgol(window, polynom)
         else:
-            raise ValueError("Method _{0}_ not implemented.".format(waveform_type))
+            raise ValueError(f"Method '{waveform_type}' not implemented.")
         return waveform
     
     def residual_magnitude(self, waveform):
@@ -291,109 +300,109 @@ class WaveForm:
         """
         return self.mag_phased - waveform
 
-def uneven_savgol_(x, y, window, polynom):
-    """
-    Applies a Savitzky-Golay filter to y with non-uniform spacing
-    as defined in x
+# def uneven_savgol_(x, y, window, polynom):
+#     """
+#     Applies a Savitzky-Golay filter to y with non-uniform spacing
+#     as defined in x
 
-    This is based on https://dsp.stackexchange.com/questions/1676/savitzky-golay-smoothing-filter-for-not-equally-spaced-data
-    The borders are interpolated like scipy.signal.savgol_filter would do
+#     This is based on https://dsp.stackexchange.com/questions/1676/savitzky-golay-smoothing-filter-for-not-equally-spaced-data
+#     The borders are interpolated like scipy.signal.savgol_filter would do
 
-    Parameters
-    ----------
-    window : int (odd)
-        Window length of datapoints. Must be odd and smaller than x
-    polynom : int
-        The order of polynom used. Must be smaller than the window size
+#     Parameters
+#     ----------
+#     window : int (odd)
+#         Window length of datapoints. Must be odd and smaller than x
+#     polynom : int
+#         The order of polynom used. Must be smaller than the window size
 
-    Returns
-    -------
-    np.array of float
-        The smoothed y values
-    """
-    if len(x) != len(y):
-        raise ValueError('"x" and "y" must be of the same size')
-    if len(x) < window:
-        raise ValueError('The data size must be larger than the window size')
+#     Returns
+#     -------
+#     np.array of float
+#         The smoothed y values
+#     """
+#     if len(x) != len(y):
+#         raise ValueError('"x" and "y" must be of the same size')
+#     if len(x) < window:
+#         raise ValueError('The data size must be larger than the window size')
 
-    if type(window) is not int:
-        raise TypeError('"window" must be an integer')
+#     if type(window) is not int:
+#         raise TypeError('"window" must be an integer')
 
-    if window % 2 == 0:
-        raise ValueError('The "window" must be an odd integer')
+#     if window % 2 == 0:
+#         raise ValueError('The "window" must be an odd integer')
 
-    if type(polynom) is not int:
-        raise TypeError('"polynom" must be an integer')
+#     if type(polynom) is not int:
+#         raise TypeError('"polynom" must be an integer')
 
-    if polynom >= window:
-        raise ValueError('"polynom" must be less than "window"')
+#     if polynom >= window:
+#         raise ValueError('"polynom" must be less than "window"')
 
-    half_window = window // 2
-    polynom += 1
+#     half_window = window // 2
+#     polynom += 1
 
-    # Initialize variables
-    A = np.empty((window, polynom))     # Matrix
-    tA = np.empty((polynom, window))    # Transposed matrix
-    t = np.empty(window)                # Local x variables
-    y_smoothed = np.full(len(y), np.nan)
+#     # Initialize variables
+#     A = np.empty((window, polynom))     # Matrix
+#     tA = np.empty((polynom, window))    # Transposed matrix
+#     t = np.empty(window)                # Local x variables
+#     y_smoothed = np.full(len(y), np.nan)
 
-    # Start smoothing
-    for i in range(half_window, len(x) - half_window, 1):
-        # Center a window of x values on x[i]
-        for j in range(0, window, 1):
-            t[j] = x[i + j - half_window] - x[i]
+#     # Start smoothing
+#     for i in range(half_window, len(x) - half_window, 1):
+#         # Center a window of x values on x[i]
+#         for j in range(0, window, 1):
+#             t[j] = x[i + j - half_window] - x[i]
 
-        # Create the initial matrix A and its transposed form tA
-        for j in range(0, window, 1):
-            r = 1.0
-            for k in range(0, polynom, 1):
-                A[j, k] = r
-                tA[k, j] = r
-                r *= t[j]
+#         # Create the initial matrix A and its transposed form tA
+#         for j in range(0, window, 1):
+#             r = 1.0
+#             for k in range(0, polynom, 1):
+#                 A[j, k] = r
+#                 tA[k, j] = r
+#                 r *= t[j]
 
-        # Multiply the two matrices
-        tAA = np.matmul(tA, A)
+#         # Multiply the two matrices
+#         tAA = np.matmul(tA, A)
 
-        # Invert the product of the matrices
-        tAA = np.linalg.inv(tAA)
+#         # Invert the product of the matrices
+#         tAA = np.linalg.inv(tAA)
 
-        # Calculate the pseudoinverse of the design matrix
-        coeffs = np.matmul(tAA, tA)
+#         # Calculate the pseudoinverse of the design matrix
+#         coeffs = np.matmul(tAA, tA)
 
-        # Calculate c0 which is also the y value for y[i]
-        y_smoothed[i] = 0
-        for j in range(0, window, 1):
-            y_smoothed[i] += coeffs[0, j] * y[i + j - half_window]
+#         # Calculate c0 which is also the y value for y[i]
+#         y_smoothed[i] = 0
+#         for j in range(0, window, 1):
+#             y_smoothed[i] += coeffs[0, j] * y[i + j - half_window]
 
-        # If at the end or beginning, store all coefficients for the polynom
-        if i == half_window:
-            first_coeffs = np.zeros(polynom)
-            for j in range(0, window, 1):
-                for k in range(polynom):
-                    first_coeffs[k] += coeffs[k, j] * y[j]
-        elif i == len(x) - half_window - 1:
-            last_coeffs = np.zeros(polynom)
-            for j in range(0, window, 1):
-                for k in range(polynom):
-                    last_coeffs[k] += coeffs[k, j] * y[len(y) - window + j]
+#         # If at the end or beginning, store all coefficients for the polynom
+#         if i == half_window:
+#             first_coeffs = np.zeros(polynom)
+#             for j in range(0, window, 1):
+#                 for k in range(polynom):
+#                     first_coeffs[k] += coeffs[k, j] * y[j]
+#         elif i == len(x) - half_window - 1:
+#             last_coeffs = np.zeros(polynom)
+#             for j in range(0, window, 1):
+#                 for k in range(polynom):
+#                     last_coeffs[k] += coeffs[k, j] * y[len(y) - window + j]
 
-    # Interpolate the result at the left border
-    for i in range(0, half_window, 1):
-        y_smoothed[i] = 0
-        x_i = 1
-        for j in range(0, polynom, 1):
-            y_smoothed[i] += first_coeffs[j] * x_i
-            x_i *= x[i] - x[half_window]
+#     # Interpolate the result at the left border
+#     for i in range(0, half_window, 1):
+#         y_smoothed[i] = 0
+#         x_i = 1
+#         for j in range(0, polynom, 1):
+#             y_smoothed[i] += first_coeffs[j] * x_i
+#             x_i *= x[i] - x[half_window]
 
-    # Interpolate the result at the right border
-    for i in range(len(x) - half_window, len(x), 1):
-        y_smoothed[i] = 0
-        x_i = 1
-        for j in range(0, polynom, 1):
-            y_smoothed[i] += last_coeffs[j] * x_i
-            x_i *= x[i] - x[-half_window - 1]
+#     # Interpolate the result at the right border
+#     for i in range(len(x) - half_window, len(x), 1):
+#         y_smoothed[i] = 0
+#         x_i = 1
+#         for j in range(0, polynom, 1):
+#             y_smoothed[i] += last_coeffs[j] * x_i
+#             x_i *= x[i] - x[-half_window - 1]
 
-    return y_smoothed
+#     return y_smoothed
 
 def uneven_savgol(x, y, window, polynom):
     """
@@ -420,13 +429,13 @@ def uneven_savgol(x, y, window, polynom):
     if len(x) < window:
         raise ValueError('The data size must be larger than the window size')
 
-    if type(window) is not int:
+    if not isinstance(window, int):
         raise TypeError('"window" must be an integer')
 
     if window % 2 == 0:
         raise ValueError('The "window" must be an odd integer')
 
-    if type(polynom) is not int:
+    if not isinstance(polynom, int):
         raise TypeError('"polynom" must be an integer')
 
     if polynom >= window:
