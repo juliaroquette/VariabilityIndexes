@@ -4,8 +4,14 @@ Base class for reading light curves
 @juliaroquette:
 Defines a base class for reading light curves, which can be inherited by other classes that analyse it.
 
-Last update:  30 June 2025
-previous update: 31 January 2024 
+Last update: 11 July 2025
+Noted an inconsistency between timescale and waveform derivation between FoldedLightCurve, VariabilityIndex and and TimeScale.
+
+previous update: 
+- 30 June 2025
+Carried out some debugging
+- 31 January 2024: 
+Last version
 
 TO DO:
 - Add reference time to fase folding
@@ -254,30 +260,37 @@ class FoldedLightCurve(LightCurve):
         else:
             raise ValueError("Either a LightCurve object or time, mag and err arrays must be provided")
         # FlodedLightCurve needs a timescale
+        if timescale is None:
+            raise ValueError("FoldedLightCurve object requires a timescale to be defined. ")
+        elif not isinstance(timescale, (int, float)):
+            raise ValueError("timescale should be a float/int value")
+        elif timescale <= 0.:
+            raise ValueError("timescale should be a positive value")
         if timescale is not None:
             self._timescale = timescale
-            self.timescale_type = 'user_defined'      
-        else:
-            from variability.timescales import TimeScale
-            ts = TimeScale(lc=self)
-            frequency_highest_peak, power_highest_peak, FAP_highest_peak = ts.get_LSP_period(periodogram=False)
-            self._timescale = 1./frequency_highest_peak
-            self._power_highest_peak = power_highest_peak
-            self._timescale_FAP = FAP_highest_peak
+
+
+        # else:
+            # from variability.timescales import TimeScale
+            # ts = TimeScale(lc=self)
+            # frequency_highest_peak, power_highest_peak, FAP_highest_peak = ts.get_LSP_period(periodogram=False)
+            # self._timescale = 1./frequency_highest_peak
+            # self._power_highest_peak = power_highest_peak
+            # self._timescale_FAP = FAP_highest_peak
             # include SF:
-            use_SF = kwargs.get('use_SF', False)
-            if bool(use_SF) & (self._power_highest_peak < ts.FAP_level[-1]):
-                print('using SF')
+            # use_SF = kwargs.get('use_SF', False)
+            # if bool(use_SF) & (self._power_highest_peak < ts.FAP_level[-1]):
+                # print('using SF')
                 #if FAP is not good enough, try SF:
-                self._timescale = ts.get_structure_function_timescale()
-                self.timescale_type = 'SF'
-                self._power_highest_peak = None
-                self._timescale_FAP = None
-            else:
-                self.timescale_type = 'LSP'
+                # self._timescale = ts.get_structure_function_timescale()
+                # self.timescale_type = 'SF'
+                # self._power_highest_peak = None
+                # self._timescale_FAP = None
+            # else:
+                # self.timescale_type = 'LSP'
             # warnings.warn("Automatic timescale estimated from LSP - FAP: {0}".format(self.timescale_FAP))
         self._reference_time = kwargs.get('reference_time', 0.)
-        # phasefold lightcurve to a given timescale
+        # phasefolded lightcurve to a given timescale
         self._get_phased_values()        
                 
         # phasefold lightcurves have a waveform
@@ -285,7 +298,7 @@ class FoldedLightCurve(LightCurve):
         self.wf = WaveForm(self.phase, self.mag_phased)
         #  check if specific window parameters were passed as input
         self._waveform_params = kwargs.get('waveform_params', {'window': round(.25*self.N),
-                                                    'polynom': 3})
+                                                    'polynom': 1})
         # check if a specific waveform type was passed as input
         self._waveform_type = kwargs.get('waveform_type', 'uneven_savgol')
         self._get_waveform()
@@ -319,15 +332,15 @@ class FoldedLightCurve(LightCurve):
         else:
             raise ValueError("Please enter a valid _positive_ timescale")  
     
-    @property
-    def timescale_FAP(self):
-        """
-        False Alarm Probability for the timescale estimated from the Lomb-Scargle periodogram. It is None if timescale was input by the user.
-        """
-        if hasattr(self, '_timescale_FAP') and self._timescale_FAP is not None:
-            return self._timescale_FAP
-        else:
-            return None              
+    # @property
+    # def timescale_FAP(self):
+    #     """
+    #     False Alarm Probability for the timescale estimated from the Lomb-Scargle periodogram. It is None if timescale was input by the user.
+    #     """
+    #     if hasattr(self, '_timescale_FAP') and self._timescale_FAP is not None:
+    #         return self._timescale_FAP
+    #     else:
+    #         return None              
         
     def _get_waveform(self, **kwargs):
         self.waveform = self.wf.get_waveform(waveform_type= kwargs.get('waveform_type', self._waveform_type), 
