@@ -254,7 +254,11 @@ class FoldedLightCurve(LightCurve):
         
         # makes sure this is also a LightCurve object
         if 'lc' in kwargs:
-            super().__init__(kwargs['lc'].time, kwargs['lc'].mag, kwargs['lc'].err)
+            lc = kwargs['lc']
+            if not isinstance(lc, LightCurve):
+                raise TypeError("'lc' must be a LightCurve instance")
+            else:
+                super().__init__(kwargs['lc'].time, kwargs['lc'].mag, kwargs['lc'].err)
         elif all(key in kwargs for key in ['time', 'mag', 'err']):
             super().__init__(kwargs['time'], kwargs['mag'], kwargs['err'], kwargs.get('mask', None))
         else:
