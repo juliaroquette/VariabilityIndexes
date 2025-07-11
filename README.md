@@ -12,7 +12,7 @@ import sys
 sys.path.append('PAT/TO/THE/PACKAGE/LOCATION')  
 ```
 
-[[_TOC_]]
+[_TOC_]
 
 # `lightcurve` module:
 
@@ -252,33 +252,12 @@ Adaptation of the [Savitzky-Golay filter](https://en.wikipedia.org/wiki/Savitzky
 </details>
 
 
-where 
+Once a waveform has been derived, a residual light curve can be estimated as:
 
 ```python
-residuals = wf.residual_magnitude(smoothed)
+residuals = wf.residual_magnitude(waveform)
 ```
 
-<details>
-
-### `WaveForm.residual_magnitude`
-
-### `WaveForm.circular_rolling_average_number`
-
-### `WaveForm.savgol`
-
-### `WaveForm.circular_rolling_average_phase`
-
-### `WaveForm.waveform_H22`
-
-### `WaveForm.waveform_Cody`
-
-### `WaveForm.uneven_savgol`
-
-
-## `uneven_savgol`
-
-# `timescale`
-</details>
 
 ## TO DO list
 - :heavy_check_mark: **@juliaroquette** Polish Lomb Scargle 
