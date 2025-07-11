@@ -264,48 +264,19 @@ class FoldedLightCurve(LightCurve):
         else:
             raise ValueError("Either a LightCurve object or time, mag and err arrays must be provided")
         # FlodedLightCurve needs a timescale
-        if timescale is None:
-            raise ValueError("FoldedLightCurve object requires a timescale to be defined. ")
-        elif not isinstance(timescale, (int, float)):
-            raise ValueError("timescale should be a float/int value")
-        elif timescale <= 0.:
-            raise ValueError("timescale should be a positive value")
-        if timescale is not None:
+        if (not isinstance(timescale, (int, float))) or (timescale <= 0.):
+            raise ValueError("FoldedLightCurve object requires a timescale (positive float/int value) to be defined.")
+        else:
             self._timescale = timescale
-
-
-        # else:
-            # from variability.timescales import TimeScale
-            # ts = TimeScale(lc=self)
-            # frequency_highest_peak, power_highest_peak, FAP_highest_peak = ts.get_LSP_period(periodogram=False)
-            # self._timescale = 1./frequency_highest_peak
-            # self._power_highest_peak = power_highest_peak
-            # self._timescale_FAP = FAP_highest_peak
-            # include SF:
-            # use_SF = kwargs.get('use_SF', False)
-            # if bool(use_SF) & (self._power_highest_peak < ts.FAP_level[-1]):
-                # print('using SF')
-                #if FAP is not good enough, try SF:
-                # self._timescale = ts.get_structure_function_timescale()
-                # self.timescale_type = 'SF'
-                # self._power_highest_peak = None
-                # self._timescale_FAP = None
-            # else:
-                # self.timescale_type = 'LSP'
-            # warnings.warn("Automatic timescale estimated from LSP - FAP: {0}".format(self.timescale_FAP))
+        # Now phasefold the light curve to the given timescale
         self._reference_time = kwargs.get('reference_time', 0.)
-        # phasefolded lightcurve to a given timescale
         self._get_phased_values()        
                 
         # phasefold lightcurves have a waveform
-        # define a WaveForm Object
-        self.wf = WaveForm(self.phase, self.mag_phased)
-        #  check if specific window parameters were passed as input
-        self._waveform_params = kwargs.get('waveform_params', {'window': round(.25*self.N),
-                                                    'polynom': 1})
-        # check if a specific waveform type was passed as input
         self._waveform_type = kwargs.get('waveform_type', 'uneven_savgol')
+        self._waveform_params = kwargs.get('waveform_params', {'window': round(.25*self.N), 'polynom': 1})
         self._get_waveform()
+
 
     def _get_phased_values(self):
         # _reference_time adds an offset to the phase 
@@ -326,31 +297,65 @@ class FoldedLightCurve(LightCurve):
     
     @timescale.setter
     def timescale(self, new_timescale):
-        if new_timescale > 0.:
+        if (not isinstance(new_timescale, (int, float))) or (new_timescale <= 0.):
+            raise ValueError("timescale must be a positive float/int value.")
+        else:
             self._timescale = new_timescale
             # update phase-folded values
             self._get_phased_values()
             # update the waveform for the new timescale
-            self.wf = WaveForm(self.phase, self.mag_phased)
             self._get_waveform()
-        else:
-            raise ValueError("Please enter a valid _positive_ timescale")  
     
-    # @property
-    # def timescale_FAP(self):
-    #     """
-    #     False Alarm Probability for the timescale estimated from the Lomb-Scargle periodogram. It is None if timescale was input by the user.
-    #     """
-    #     if hasattr(self, '_timescale_FAP') and self._timescale_FAP is not None:
-    #         return self._timescale_FAP
-    #     else:
-    #         return None              
+    @property
+    def reference_time(self):
+        """ Reference time for phase folding."""
+        return self._reference_time
+
+    @reference_time.setter
+    def reference_time(self, new_reference_time):
+        self._reference_time = new_reference_time
+        self._get_phased_values()
+        self._get_waveform()
         
-    def _get_waveform(self, **kwargs):
-        self.waveform = self.wf.get_waveform(waveform_type= kwargs.get('waveform_type', self._waveform_type), 
-                                             waveform_params=kwargs.get('waveform_params', self._waveform_params))
+    @property
+    def waveform_type(self):
+        return self._waveform_type    
+    
+    @waveform_type.setter
+    def waveform_type(self, new_type):
+        self._waveform_type = new_type
+        self._get_waveform()
+
+    @property
+    def waveform_params(self):
+        return self._waveform_params
+
+    @waveform_params.setter
+    def waveform_params(self, new_params):
+        self._waveform_params = new_params
+        self._get_waveform()   
+        
+    def _get_waveform(self):
+        """
+        Derives the waveform and update the residual curve
+        """
+        wf = WaveForm(self.phase, self.mag_phased)
+        self.waveform = wf.get_waveform(
+            waveform_type=self._waveform_type,
+            waveform_params=self._waveform_params
+        )
         # phasefolded lightcurves also have a residual curve between the waveform and the lightcurve
-        self.residual = self.wf.residual_magnitude(self.waveform)
+        self.residual = wf.residual_magnitude(self.waveform)
+
+    def set_waveform(self, waveform_type=None, waveform_params=None):
+        """
+        Update both waveform_type and waveform_params at the same time
+        """
+        if waveform_type is not None:
+            self._waveform_type = waveform_type
+        if waveform_params is not None:
+            self._waveform_params = waveform_params
+        self._get_waveform()
     
     def _list_properties(self):
         """
@@ -360,7 +365,7 @@ class FoldedLightCurve(LightCurve):
         return property_names    
         
     def __str__(self):
-        return f'A FoldedLightCurve instance has the following properties: {repr(self._list_properties())}'        
+        return f'A FoldedLightCurve instance has the following properties: {repr(self._list_properties())}'
 
     @classmethod
     def suppress_warnings_globally(cls):
@@ -383,7 +388,11 @@ class FoldedLightCurve(LightCurve):
         """
         cls._suppress_warnings = False        
 
-
+    def __repr__(self):
+        return (f"<FoldedLightCurve(timescale={self._timescale}, "
+            f"waveform_type={self._waveform_type}, "
+            f"N={self.N})>")
+    
 class SyntheticLightCurve:
     """
     A class to generate synthetic light curves.
