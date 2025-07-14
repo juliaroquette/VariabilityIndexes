@@ -2,16 +2,6 @@
 Module for computing variability timescales.
 
 @juliaroquette:
-
-
-TODO: 
-- Modify LSP to use least-squares fitting to get the best period
-- Debug SAVGOL
-- Can I make an version of savgol where the window runs as a function of phase?
-
-
-
-
 """
 
 import numpy as np
@@ -36,6 +26,15 @@ class TimeScale(LightCurve):
             self.lc = LightCurve(self.time, self.mag, self.err)
         else:
             raise ValueError("Either a LightCurve object or time, mag and err arrays must be provided")  
+        # initialize attributes
+        self.ts = np.nan
+        self.method = None
+        self.fap = np.nan
+        self.power = np.nan
+        self.LSP_ts = np.nan
+        self.C0 = np.nan
+        self.C1 = np.nan
+        self.SF_ts = np.nan
         # deal with which timescale method to use
         # if method is SF or LSP, it will only return the timescale in the given method. Otherwise, it will attempt to get a timescale using LSP first, and then SF if no periodic timescale was found.
         if 'method' not in kwargs:
@@ -45,95 +44,40 @@ class TimeScale(LightCurve):
             raise ValueError("Method must be 'LSP', 'SF' or 'auto'")
         method = kwargs['method'] 
         #
-        fap = kwargs.get('fap_prob', 0.001)
+        fap_prob = kwargs.get('fap_prob', 0.01)
         definition = kwargs.get('definition', 'auto')
+        osf, min_freq, max_freq = pre_defined_parameters(self.time, definition=definition)
         # if methods set to lomb scargle or to auto, first try to get 
         # timescales using the Lomb-Scargle periodogram
-        if (method == 'LSP') or (method == 'auto'):
-            best_freq, best_power, FAP_highest_peak = self.get_LSP_period(fmin=kwargs.get('fmin', 
-                                                self.get_min_freq(definition=definition)), 
-                                fmax=kwargs.get('fmax', 
-                                                self.get_max_freq(definition=definition)), 
-                                osf=kwargs.get('osf', 
-                                                self.get_osf(definition=definition)), 
-                                periodogram=kwargs.get('periodogram', False), 
-                                fap_prob=fap, definition=definition)
-    
-            if (FAP_highest_peak < fap) or (method =="LSP"):
-                self.ts = 1 / best_freq
-                self.fap = FAP_highest_peak
-                self.power = best_power
+        if method in ['LSP', 'auto']:
+            best_freq, best_power,\
+            FAP_highest_peak = self.get_LSP_period(fmin=min_freq,
+                                                   fmax=max_freq, 
+                                                   osf=osf, 
+                                                   periodogram=kwargs.get('periodogram', False), 
+                                                   definition=definition)
+            self.LSP_ts = 1 / best_freq
+            self.fap = FAP_highest_peak
+            self.power = best_power
+            
+            if (FAP_highest_peak < fap_prob) or (method =="LSP"):
+                self.ts = 1.*self.LSP_ts 
                 self.method = 'LSP'
-            else:
-                self.ts = np.nan
-                self.fap = np.nan
-                self.power = np.nan
-                self.method = ''
         # if method is set to SF, or if no timescale was obtained from LS
         # then proceed to get timescale from SF
-        if kwargs['method'] == 'SF' or kwargs['method'] == 'auto' and not hasattr(self, 'ts'):
-            self.ts, self.C0, self.C1 = self.get_structure_function_timescale()
-            self.method = 'SF'
-
-            
-    def get_min_freq(self, definition='Gaia'):
-        """
-        Returns the minimum frequency based on different definitions.
-        """
-        if definition == 'Gaia':
-            return 0.5 / (max(self.time) - min(self.time))
-        elif definition == 'Chloe':
-            return 1./ ((max(self.time) - min(self.time)))
-        elif definition == 'auto':
-            """
-            Guarantees at least one full period cycle is covered
-            """
-            return 2 / (max(self.time) - min(self.time)/2)
-        else:
-            raise ValueError("Definition must be 'Gaia', 'auto' or 'Chloe'")
-    
-    def get_max_freq(self, definition='Gaia'):
-        """
-        Returns the maximum frequency based on different definitions.
-        """
-        if definition == 'Gaia':
-            return 2.8
-        elif definition == 'Chloe':
-            return 1 / (np.median(np.diff(self.time)) * 2)
-        elif definition == 'auto':
-            return 1./ 0.5 / (np.median(np.diff(self.time)))
-            
-        else:
-            raise ValueError("Definition must be 'Gaia', 'auto' or 'Chloe'")
-
-    def get_osf(self, definition='Gaia'):
-        """
-        This factor is called samples_per_peak in Astropy's LombScargle
-        and it defaults to 5. 
-        Once fmin and fmax are defined, this is used to set the step in frequency for the .autopower method. 
-        In Gaia, this is called `stepFrequencyScaleFactor` and had 
-        recommended values of 5 in DR3 and 10 in DR4.
-        """
-        if definition == 'Gaia':
-            return 10
-        elif definition == 'Chloe':
-            # Chloe defined that dynamically where she actually fiexes the df
-            return 5
-        elif definition == 'auto':
-            return 5
-        else:
-            raise ValueError("Definition must be 'Gaia', 'auto', or 'Chloe'")        
-        #   ts, y_fit, params, fit_errors = SF.find_timescale(np.array(sf), np.array(t_log), threshold=5e-5, plot=plot, method = 'minuit', last_params=[15, 0.02, 0.08, 1])
-
-        # step_size = 1 / (scale_factor * (last_time - first_time))
-        # scale_factor = 10.
+        if method == 'SF' or (method == 'auto' and (self.method is None)):
+            try:
+                self.SF_ts, self.C0, self.C1 = self.get_structure_function_timescale()
+                self.method = 'SF'
+                self.ts = 1.*self.SF_ts
+            except Exception as e:
+                warnings.warn(f"Structure Function failed: {e}")
                 
     def get_LSP_period(self, 
                           fmin, 
                           fmax,
                           osf,
                           periodogram,
-                          fap_prob,
                           definition='auto'):
         """
         Simple Period estimation code using Lomb-Scargle. 
@@ -166,7 +110,7 @@ class TimeScale(LightCurve):
         """
         # define the base for the Lomb-Scargle
         ls = LombScargle(self.time, self.mag, self.err)
-        if definition != 'Chloe':
+        if definition == 'Chloe':
             frequency = np.arange(fmin, fmax, step=0.0002)
             power = ls.power(frequency, method='slow')
         else:
@@ -174,6 +118,7 @@ class TimeScale(LightCurve):
                                             minimum_frequency=fmin,
                                             maximum_frequency=fmax, 
                                             method='slow') 
+            # note here that method="slow" gives the astropy equivalente of GLS
 
         self.FAP_probs = ls.false_alarm_probability(power,method='baluev', 
                                             minimum_frequency=fmin, 
@@ -204,13 +149,47 @@ class TimeScale(LightCurve):
         # print('SF timescale:', sf.ts)
         return sf.ts, sf.C0, sf.C1
     
-    def get_MSE_timescale(self):
-        pass
+    # def get_MSE_timescale(self):
+    #     pass
     
-    def get_CPD_timescale():
-        pass
-
-
+    # def get_CPD_timescale():
+    #     pass
+def pre_defined_parameters(time, definition='Gaia'):
+    """
+    Returns pre-defined parameters for the TimeScale class.
+    
+    What is defined:
+    - ofs (samples per peak:)
+        This factor is called samples_per_peak in Astropy's LombScargle
+        and it defaults to 5. 
+        Once fmin and fmax are defined, this is used to set the step in frequency for the .autopower method. 
+        In Gaia, this is called `stepFrequencyScaleFactor` and had 
+        recommended values of 5 in DR3 and 10 in DR4.
+    - min_freq (minimum frequency):
+        This is the minimum frequency for the periodogram.
+    - max_freq (maximum frequency):
+        This is the maximum frequency for the periodogram.
+    """
+    if definition == 'Gaia':
+        osf = 10
+        min_freq = 0.001
+        max_freq = 2.8
+    elif definition == 'Chloe':
+        # Chloe defined that dynamically where she actually fiexes the df
+        osf = 5
+        min_freq = 1./ ((max(time) - min(time)))
+        max_freq = 1 / (np.median(np.diff(time)) * 2)
+    elif definition == 'auto':
+        osf = 5
+        # Guarantees at least one full period cycle is covered
+        min_freq = 2 / (max(time) - min(time)/2)
+        max_freq = 1./ 0.5 / (np.median(np.diff(time)))
+    else:
+        raise ValueError("Definition must be 'Gaia', 'auto', or 'Chloe'")        
+        #   ts, y_fit, params, fit_errors = SF.find_timescale(np.array(sf), np.array(t_log), threshold=5e-5, plot=plot, method = 'minuit', last_params=[15, 0.02, 0.08, 1])
+        # step_size = 1 / (scale_factor * (last_time - first_time)
+    return osf, min_freq, max_freq
+    
 class StructureFunction(LightCurve):
     '''
     Class for computing the structure function of a light curve.
@@ -293,7 +272,7 @@ class StructureFunction(LightCurve):
                 lags_ind  = np.where((delta_t > time_bin - bin_diff[0]) & (delta_t < time_bin + bin_diff[1]))[0]
 
             if len(lags_ind) > 0:
-                self.sf[i] = np.mean(delta_mag[lags_ind]) #- 2*np.mean(delta_err[lags_ind])**2
+                self.sf[i] = np.mean(delta_mag[lags_ind], ddof=1) #- 2*np.mean(delta_err[lags_ind])**2
             
             it_list.append(len(lags_ind))
         # Remove NaN values and return the results
@@ -308,14 +287,14 @@ class StructureFunction(LightCurve):
     @staticmethod
     def chi_squared(x, y, t0, C0, C1, beta):
         model = StructureFunction.model_function(x, t0, C0, C1, beta)
-        return (np.sum((y - model) ** 2/np.std(y)**2))
+        return (np.sum((y - model) ** 2/np.std(y, ddof=1)**2))
 
     @staticmethod
     def log_chi_squared(x, y, t0, C0, C1, beta):
         model     = StructureFunction.model_function(x, t0, C0, C1, beta)
         log_y     = np.log10(y)
         log_model = np.log10(model)
-        return np.sum((log_y - log_model) ** 2 / np.std(log_y) ** 2)    
+        return np.sum((log_y - log_model) ** 2 / np.std(log_y, ddof=1) ** 2)    
     ################################################
     #Derive timescale    
         
@@ -324,7 +303,7 @@ class StructureFunction(LightCurve):
     def fit_with_minuit(self, last_params=None):
 
         if last_params is None:
-            last_params = [1.0, 0.1, 0.1, 1.0]  # Initial guesses for parameters
+            last_params = [15, 0.02, 0.08, 1.]  #  Initial guesses for parameters t0, c0, C1, beta
 
         # Define a wrapped function for Minuit that only takes the parameters to be optimized
         @staticmethod
@@ -464,7 +443,7 @@ class StructureFunction_(LightCurve):
                 lags_ind  = np.where((delta_t > time_bin - bin_diff[0]) & (delta_t < time_bin + bin_diff[1]))[0]
 
             if len(lags_ind) > 0:
-                self.sf[i] = np.mean(delta_mag[lags_ind]) #- 2*np.mean(delta_err[lags_ind])**2
+                self.sf[i] = np.mean(delta_mag[lags_ind], ddof=1) #- 2*np.mean(delta_err[lags_ind])**2
             
             it_list.append(len(lags_ind))
         # Remove NaN values and return the results
@@ -479,14 +458,14 @@ class StructureFunction_(LightCurve):
     @staticmethod
     def chi_squared(x, y, t0, C0, C1, beta):
         model = StructureFunction.model_function(x, t0, C0, C1, beta)
-        return (np.sum((y - model) ** 2/np.std(y)**2))
+        return (np.sum((y - model) ** 2/np.std(y, ddof=1)**2))
 
     @staticmethod
     def log_chi_squared(x, y, t0, C0, C1, beta):
         model     = StructureFunction.model_function(x, t0, C0, C1, beta)
         log_y     = np.log10(y)
         log_model = np.log10(model)
-        return np.sum((log_y - log_model) ** 2 / np.std(log_y) ** 2)    
+        return np.sum((log_y - log_model) ** 2 / np.std(log_y, ddof=1) ** 2)    
     ################################################
     #Derive timescale    
         
