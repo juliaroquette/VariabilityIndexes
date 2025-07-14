@@ -188,46 +188,49 @@ class VariabilityIndex:
 
 
     class Q_index:
-        def __init__(self, parent, waveform_type, waveform_params):
+        def __init__(self, parent#, waveform_type, waveform_params
+                     ):
+            # waveform is a propertie of FoldedLightCurve and not Q_index. 
+            # I am thus refactoring this to avoid conflicting definitions
             self.parent = parent
-            self._waveform_type = waveform_type
-            self._waveform_params = waveform_params
+            # self._waveform_type = waveform_type
+            # self._waveform_params = waveform_params
             
-        @property
-        def waveform_type(self):
-            """ 
-            Waveform estimator method used to calculate the Q-index 
-            """
-            return self._waveform_type
+        # @property
+        # def waveform_type(self):
+            # """ 
+            # Waveform estimator method used to calculate the Q-index 
+            # """
+            # return self._waveform_type
 	
-        @waveform_type.setter
-        def waveform_type(self, new_waveform_type):
-            implemented_waveform_types = ['savgol', 'Cody',
-                                     'circular_rolling_average_phase',
-                                     'circular_rolling_average_number',
-                                     'H22', 'uneven_savgol']
-            if new_waveform_type in implemented_waveform_types:
-                self._waveform_type = new_waveform_type
-            else:
-                raise ValueError("Please enter a valid waveform type {0}".format(implemented_waveform_types))
+        # @waveform_type.setter
+        # def waveform_type(self, new_waveform_type):
+        #     implemented_waveform_types = ['savgol', 'Cody',
+        #                              'circular_rolling_average_phase',
+        #                              'circular_rolling_average_number',
+        #                              'H22', 'uneven_savgol']
+        #     if new_waveform_type in implemented_waveform_types:
+        #         self._waveform_type = new_waveform_type
+        #     else:
+        #         raise ValueError("Please enter a valid waveform type {0}".format(implemented_waveform_types))
             
-        @property
-        def waveform_params(self):
-            """ 
-            Parameters used to calculate the Q-index 
-            """
-            return self._waveform_params
+        # @property
+        # def waveform_params(self):
+        #     """ 
+        #     Parameters used to calculate the Q-index 
+        #     """
+        #     return self._waveform_params
         
-        @waveform_params.setter
-        def waveform_params(self, new_waveform_params):
-            self._waveform_params = new_waveform_params
+        # @waveform_params.setter
+        # def waveform_params(self, new_waveform_params):
+        #     self._waveform_params = new_waveform_params
            
         @property
         def value(self):
             # print(self._waveform_type)
-            self.parent.lc._get_waveform()
-            return (np.std(self.parent.lc.residual)**2 - np.mean(self.parent.lc.err_phased)**2)\
-                /(np.std(self.parent.lc.mag_phased)**2 - np.mean(self.parent.lc.err_phased)**2)
+            # self.parent.lc._get_waveform()
+            return (np.std(self.parent.lc.residual, ddof=1)**2 - np.mean(self.parent.lc.err_phased)**2)\
+                /(np.std(self.parent.lc.mag_phased, ddof=1)**2 - np.mean(self.parent.lc.err_phased)**2)
 
     def _list_properties(self):
         """
