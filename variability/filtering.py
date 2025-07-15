@@ -255,8 +255,9 @@ class WaveForm:
         - ValueError: If the data size is smaller than the window size or if the window is not an odd integer.
         - TypeError: If window or polynom are not integers.
         """
-        x = np.concatenate((self.phase - 1, self.phase, 1 + self.phase))
+        x = np.concatenate((self.phase - 1., self.phase, 1. + self.phase))
         y = np.concatenate((self.mag_phased, self.mag_phased, self.mag_phased)) 
+        print(f"Debugging uneven_savgol with window={window}, polynom={polynom}")
         return  uneven_savgol(x, y, window, polynom)  [self.N:2*self.N]
     
     def get_waveform(self, waveform_type='uneven_savgol', waveform_params={}):
@@ -272,12 +273,14 @@ class WaveForm:
             waveform = self.circular_rolling_average_phase(wd_phase=wd_phase)
         elif waveform_type == 'circular_rolling_average_number':
             window_size = waveform_params.get('window_size', 0.1*self.N)
+            window_size = int(round(window_size))
             waveform = self.circular_rolling_average_number(window_size=window_size)
         elif waveform_type == 'H22':
             kernel = waveform_params.get('kernel', 4.)
             waveform = self.waveform_H22(kernel=kernel)
         elif waveform_type == 'uneven_savgol':
-            window = waveform_params.get('window', round(0.25*self.N))
+            window = waveform_params.get('window', 0.25*self.N)
+            window = int(round(window))
             if window % 2 == 0:
                 window += 1
             polynom = waveform_params.get('polynom', 1)
