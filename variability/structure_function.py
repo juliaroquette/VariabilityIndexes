@@ -45,15 +45,26 @@ class StructureFunction(LightCurve):
         Uses adaptative_binning to bin the structure function data.
         The output is stored in the class attributes sf_binned, time_bins, sf_bin_err, pair_counts and irregular_bin.
         """
-        num_bins=100, log=True, hybrid=False,
-        min_bin_num=5, max_expand_factor=3.0        
-        num_bins = kwargs.get('num_bins', 1.5*len(self.time))
-        self.sf_binned, self.time_bins, self.sf_bin_err, self.pair_counts, self.irregular_bin = adaptative_binning(
-            self.time_lag, self.sf_vals, self.sf_err,
-            num_bins=100, log=True, hybrid=False,
-            min_bin_num=5, max_expand_factor=3.0
-        )
 
+        sf_err = kwargs.get('sf_err', None)
+        log = kwargs.get('log', True)
+        hybrid = kwargs.get('hybrid', False)
+        bin_min_size = kwargs.get('bin_min_size', 5)
+        max_bin_exp_factor = kwargs.get('max_bin_exp_factor', 3.0)
+        resolution = kwargs.get('resolution', 0.15)
+        self.sf_binned, self.time_bins, self.sf_bin_err, self.pair_counts, self.irregular_bin = adaptative_binning(self.time_lag, self.sf_vals, sf_err=sf_err,
+                       log=log,
+                       hybrid=hybrid,
+                       bin_min_size=bin_min_size,
+                       max_bin_exp_factor=max_bin_exp_factor,
+                       resolution=resolution)
+    
+    def fit_sf(self, model=model_function, **kwargs):
+        """
+        Fits the structure function using a specified model.
+        """
+        pass
+        pass
 
 
 def get_sf_time_lags(time, mag, err):
@@ -103,7 +114,9 @@ def adaptative_binning(time_lag, sf_values, sf_err=None,
                        hybrid=False,
                        bin_min_size=5, 
                        max_bin_exp_factor=3.0, 
-                       resolution=0.15):
+                       step_size=0.2, 
+                       resolution=0.02,
+                       rolling=False):
     """
     Suite of adaptative binning methods.
     This bins data in either log/linear space, while ensuring
@@ -127,10 +140,12 @@ def adaptative_binning(time_lag, sf_values, sf_err=None,
         max_bin_exp_factor: maximum factor by which to expand bin width. 
                     It is clipped to 3.0, which is the case when the bin is merged to
                     its two immediate neighbours.
+        step_size:  Step size for bin expansion.
+                    Should be between 0.05 and 1.0 for 5 to 100%
         resolution: Resolution for binning. If log=True, this is in dex.
                     If log=False, this is in linear units.
-                    Recommended maximum value for log scale is 0.15 for log binning 
-                    (guarantees a 5 days timescale is distinguishable from a 7 days one)
+                    Recommended maximum value for log scale is 0.02 for log binning 
+                    (guarantees bins 0.5 days appart at tau=10 days)
     Returns:
         sf_binned, time_bins, sf_bin_err, pair_counts, irregular_bin
         where:
@@ -142,6 +157,7 @@ def adaptative_binning(time_lag, sf_values, sf_err=None,
                          0.0 if regular, 
                          -1.0 if using individual pairs
                          >0.0 final expanded bin width used
+    
     """
 
     # note that we need some limit in this max_bin_exp_factor
@@ -150,11 +166,19 @@ def adaptative_binning(time_lag, sf_values, sf_err=None,
     # the limit set here is the case when the bin is merged 
     # with its two immediate neighbours
     max_bin_exp_factor = min(max_bin_exp_factor, 3.)
+    # bins are not allowed to shrink
+    max_bin_exp_factor = max(1.0, max_bin_exp_factor)
+    # ensures the step is between 5% and 100%
+    step_size = min(1., step_size) 
+    step_size = max(0.05, step_size)
+
+    sf_binned, time_bins, sf_bin_err, pair_counts, irregular_bin = [], [], [], [], []
+
 
     # get bins and edges:
     bin_edges, centres  = bin_edges_and_centers(time_lag, resolution, log=log)
         
-    sf_binned, time_bins, sf_bin_err, pair_counts, irregular_bin = [], [], [], [], []
+
     bin_idxs = np.digitize(time_lag, bin_edges, right=True) - 1  # subtract 1 for bin indexes starting at 0
     for i in range(len(bin_edges) - 1):
 
@@ -195,10 +219,10 @@ def adaptative_binning(time_lag, sf_values, sf_err=None,
                     # expand bin until either it has enough pairs 
                     # or it reaches the max_bin_width allowed
                     new_width = resolution
-                    step = 0.2 * resolution # use 20% of the resolution as an increment
+                    step = step_size * resolution # use step_size (%) of the resolution as an increment
                     found = False
                     while (new_width < max_bin_exp_factor * resolution):
-                        # add increment of 20% the resolution
+                        # add increment of step_size the resolution
                         new_width += step
                         if log:
                             log_center = np.log10(centres[i])                       
@@ -281,7 +305,8 @@ def bin_edges_and_centers(time_lag,
     # len(edges) == len(centres) + 1
     return edges, centres         
 
-def model_function(x, t0, C0, C1, beta):
+def model_function(x, t0, C0, C1):
     """
-    Model function for the structure function."""
-    return C1 * (1 - np.exp(-(x / t0))**beta) + C0
+    Model function for the structure function.
+    """
+    return C1 * (1 - np.exp(-(x / t0))) + C0
