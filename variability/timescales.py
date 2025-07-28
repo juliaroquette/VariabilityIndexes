@@ -17,6 +17,7 @@ from iminuit import Minuit
 import warnings
 import matplotlib.pyplot as plt
 from variability.lightcurve import LightCurve
+from variability.structure_function import StructureFunction
 
 class TimeScale(LightCurve):
     def __init__(self, **kwargs):
