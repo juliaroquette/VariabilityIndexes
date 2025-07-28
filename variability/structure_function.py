@@ -115,8 +115,7 @@ def adaptative_binning(time_lag, sf_values, sf_err=None,
                        bin_min_size=5, 
                        max_bin_exp_factor=3.0, 
                        step_size=0.2, 
-                       resolution=0.02,
-                       rolling=False):
+                       resolution=0.02):
     """
     Suite of adaptative binning methods.
     This bins data in either log/linear space, while ensuring
@@ -147,7 +146,7 @@ def adaptative_binning(time_lag, sf_values, sf_err=None,
                     Recommended maximum value for log scale is 0.02 for log binning 
                     (guarantees bins 0.5 days appart at tau=10 days)
     Returns:
-        sf_binned, time_bins, sf_bin_err, pair_counts, irregular_bin
+        time_bins, sf_binned, sf_bin_err, pair_counts, irregular_bin
         where:
         - sf_binned:   binned SF values
         - time_bins:   centers of the bins
@@ -166,19 +165,14 @@ def adaptative_binning(time_lag, sf_values, sf_err=None,
     # the limit set here is the case when the bin is merged 
     # with its two immediate neighbours
     max_bin_exp_factor = min(max_bin_exp_factor, 3.)
-    # bins are not allowed to shrink
-    max_bin_exp_factor = max(1.0, max_bin_exp_factor)
     # ensures the step is between 5% and 100%
     step_size = min(1., step_size) 
     step_size = max(0.05, step_size)
 
-    sf_binned, time_bins, sf_bin_err, pair_counts, irregular_bin = [], [], [], [], []
-
-
     # get bins and edges:
     bin_edges, centres  = bin_edges_and_centers(time_lag, resolution, log=log)
         
-
+    sf_binned, time_bins, sf_bin_err, pair_counts, irregular_bin = [], [], [], [], []
     bin_idxs = np.digitize(time_lag, bin_edges, right=True) - 1  # subtract 1 for bin indexes starting at 0
     for i in range(len(bin_edges) - 1):
 
@@ -247,7 +241,7 @@ def adaptative_binning(time_lag, sf_values, sf_err=None,
                             sf_bin_err.append(np.sqrt(np.sum(sf_err[bin_idx]**2)) /len(bin_idx))
                         else:
                             sf_bin_err.append(np.std(sf_values[bin_idx], ddof=1) / np.sqrt(len(bin_idx)))
-    return np.array(sf_binned), np.array(time_bins), np.array(sf_bin_err), np.array(pair_counts), np.array(irregular_bin)
+    return np.array(time_bins), np.array(sf_binned), np.array(sf_bin_err), np.array(pair_counts), np.array(irregular_bin)
 
 
 def bin_edges_and_centers(time_lag, 
