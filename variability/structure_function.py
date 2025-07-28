@@ -51,20 +51,130 @@ class StructureFunction(LightCurve):
         hybrid = kwargs.get('hybrid', False)
         bin_min_size = kwargs.get('bin_min_size', 5)
         max_bin_exp_factor = kwargs.get('max_bin_exp_factor', 3.0)
-        resolution = kwargs.get('resolution', 0.15)
+        resolution = kwargs.get('resolution', 0.02)
+        step_size = kwargs.get('step_size', 0.2)
         self.sf_binned, self.time_bins, self.sf_bin_err, self.pair_counts, self.irregular_bin = adaptative_binning(self.time_lag, self.sf_vals, sf_err=sf_err,
                        log=log,
                        hybrid=hybrid,
                        bin_min_size=bin_min_size,
                        max_bin_exp_factor=max_bin_exp_factor,
-                       resolution=resolution)
+                       resolution=resolution,
+                       step_size=step_size)
+            
     
-    def fit_sf(self, model=model_function, **kwargs):
+    def fit_sf(self, **kwargs):
         """
         Fits the structure function using a specified model.
+        
+        As Default, it uses the reduced chi-squared cost function in log scale.
+        This means that `cost_function` is called with:
+        - `yerr=self.sf_bin_err`, 
+        - `log=True`, 
+        - `cost_flavour='L2_error'` 
+        - `reduced_chi2=True`
         """
-        pass
-        pass
+        model = kwargs.get('model', "L2_error")
+        log = kwargs.get('log', True)
+        reduced_chi2 = kwargs.get('reduced_chi2', True)
+        cost_flavour = kwargs.get('cost_flavour', 'L2_error')
+        yerr = kwargs.get('yerr', self.sf_bin_err)
+        # best model fit
+        self.y_fit, \
+        # best model params t0_fit, C0_fit, C1_fit
+        self.params, \
+        # errors on the best fit params
+        self.fit_errors, \
+        # cost minimum,
+        self.cost_min = self.fit_structure_function(self.time_bins, 
+                                                  self.sf_binned, 
+                                                  yerr=yerr, 
+                                                  model=model, 
+                                                  log=log, 
+                                                  cost_flavour=cost_flavour, 
+                                                  reduced_chi2=reduced_chi2)
+    def get_timescale(self, C0C1_min=None, 
+                        C0_error_min=None, 
+                        C1_error_min=None, 
+                        t0_error_min=None, 
+                        cost_min_range=None, 
+                        C0_range=None,
+                        C1_range=None,
+                        t0_range=None):
+        """
+        Computes the timescale of the structure function.
+        
+        Uses the fitted parameters from fit_sf() to compute the timescale.
+        Returns the timescale t0_fit, C0_fit, C1_fit and their errors.
+        """
+        if evaluate_timescale(self.params, 
+                                  self.fit_errors, 
+                                  self.cost_min,
+                                  C0C1_min=C0C1_min,
+                                  C0_error_min=C0_error_min,
+                                  C1_error_min=C1_error_min,
+                                  t0_error_min=t0_error_min,
+                                  cost_min_range=cost_min_range,
+                                  C0_range=C0_range,
+                                  C1_range=C1_range,
+                                  t0_range=t0_range):
+            self.sf_timescale = self.params[0]  # t0_fit
+            self.sf_C0 = self.params[1]
+            self.sf_C1 = self.params[2]
+            self.timescale_error = self.fit_errors[0]  # t0_err
+        else:
+            print("Structure function fit did not pass the validation criteria.")
+            self.sf_timescale = None
+            self.sf_C0 = None
+            self.sf_C1 = None
+            self.timescale_error = None
+            
+    
+def evaluate_timescale(params, fit_errors, cost_min,
+                        C0C1_min=None, 
+                        C0_error_min=None, 
+                        C1_error_min=None, 
+                        t0_error_min=None, 
+                        cost_min_range=None, 
+                        C0_range=None,
+                        C1_range=None,
+                        t0_range=None):
+    """
+    Evaluates the timescale of the structure function.
+    
+    Uses the fitted parameters from fit_sf() to compute the timescale.
+    Returns the timescale t0_fit, C0_fit, C1_fit and their errors.
+    """
+    
+    t0_fit, C0_fit, C1_fit = params
+    t0_err, C0_err, C1_err = fit_errors
+    
+    validate = True
+    if C0C1_min:
+        # test if C1 is at least 
+        if (C1_fit/ C0_fit < C0C1_min):
+            validate = False
+    if C0_error_min:
+        if (C0_fit/ C0_err  < C0_error_min):
+            validate = False
+    if C1_error_min:
+        if (C1_fit / C1_err  < C1_error_min):
+            validate = False
+    if t0_error_min:
+        if (t0_fit / t0_err < t0_error_min):
+            validate = False
+    if cost_min_range:
+        if (cost_min < cost_min_range[0]) or (cost_min > cost_min_range[1]):
+            validate = False
+    if C0_range:
+        if (C0_fit < C0_range[0]) or (C0_fit > C0_range[1]):
+            validate = False
+    if C1_range:
+        if (C1_fit < C1_range[0]) or (C1_fit > C1_range[1]):
+            validate = False
+    if t0_range:
+        if (t0_fit < t0_range[0]) or (t0_fit > t0_range[1]):
+            validate = False
+    return validate
 
 
 def get_sf_time_lags(time, mag, err):
@@ -337,12 +447,13 @@ def cost_function(x, y, t0, C0, C1,
         Calculated cost value based on the flavour chosen. """
     model = model_function(x, t0, C0, C1)
     # deals with uncertainty
-    if yerr is None and cost_flavour in ['L2_error', 'L1_error']:
-        # if no uncertainty is provided, assumes the 
-        # uncertainty is represented by the standard deviation of the residuals
-        error = np.std(y - model, ddof=1)
-    else:
-        error = 1. * yerr
+    if cost_flavour in ['L2_error', 'L1_error']:
+        if yerr is None:
+            # if no uncertainty is provided, assumes the 
+            # uncertainty is represented by the standard deviation of the residuals
+            error = np.std(y - model, ddof=1)
+        else:
+            error = 1. * yerr
     if log:
         if cost_flavour in ['L2_error', 'L1_error']:
                 # error propagation for log scale
