@@ -297,10 +297,82 @@ def bin_edges_and_centers(time_lag,
         for i in range(1, n_bins):
             edges[i] = (centres[i-1] + centres[i]) / 2
     # len(edges) == len(centres) + 1
-    return edges, centres         
+    return edges, centres       
 
 def model_function(x, t0, C0, C1):
     """
     Model function for the structure function.
     """
     return C1 * (1 - np.exp(-(x / t0))) + C0
+
+def cost_function(x, y, t0, C0, C1, 
+                  yerr=None, 
+                  log=False, 
+                  cost_flavour='L2_chloe', 
+                  reduced_chi2=False, 
+                  input_cost=None):
+    """Suite of cost functions for fitting the structure function.
+    Args:
+        x: time lags
+        y: structure function values
+        t0: timescale parameter
+        C0: constant offset parameter
+        C1: amplitude parameter
+        yerr: uncertainties on the structure function values (if they are to be propagated)
+        log: if True, uses log10 of the values for fitting
+        cost_flavour: type of cost function to use:
+            1. 'L2_chloe': Minimization of square of residuals normalized by the standard deviation of the data
+            2. 'L2': Minimization of square of residuals
+            3. 'L2_error': (chi-squared) Minimization of square of residuals normalized by the uncertainties
+            4. 'L1': Minimization of absolute residuals
+            5. 'L1_error': Minimization of absolute residuals normalized by the uncertainties
+            6. 'input': if a custom cost function is provided, use it.
+                Function should take y, model, and error as arguments
+        reduced_chi2: if True, and `cost_flavour=L2_error` returns the reduced chi-squared value,
+                    which is the L2_error divided by the number of degrees of freedom (N-k), where
+                    k = 3 is the number of free parameters in our SF model (C0, C1, t0).
+        input_cost: a custom cost function that takes y, model, and error as arguments, must be provided if 
+                    cost_flavour is set to 'input'.
+    Returns:
+        Calculated cost value based on the flavour chosen. """
+    model = model_function(x, t0, C0, C1)
+    # deals with uncertainty
+    if yerr is None and cost_flavour in ['L2_error', 'L1_error']:
+        # if no uncertainty is provided, assumes the 
+        # uncertainty is represented by the standard deviation of the residuals
+        error = np.std(y - model, ddof=1)
+    else:
+        error = 1. * yerr
+    if log:
+        if cost_flavour in ['L2_error', 'L1_error']:
+                # error propagation for log scale
+                error = error / (1. * y * np.log(10))
+        assert np.all(y > 0) and np.all(model > 0), "Values of time-lag and SF should always be positive - something is wrong."
+        y = np.log10(y)
+        model = np.log10(model)
+
+    if reduced_chi2 and len(y) > 3: # Check if there are enough data points to make sure code won't crash
+        # returns the reduced chi-squared value for L2_error
+        red = len(y) - 3 
+        # this is the 1/(N-k) term for the reduced chi-squared
+        # where N is the number of data points and k is the number
+        # of free parameters in the model (k=3 for the C0, C1 and t0 paramters)
+    else:
+        red = 1.0
+
+    if cost_flavour == 'L2_chloe':
+        return np.sum((y - model) ** 2 / np.std(y, ddof=1) ** 2)
+    elif cost_flavour == 'L2':
+        return np.sum((y - model) ** 2) / red
+    elif cost_flavour == 'L2_error':
+        return np.sum(((y - model) / error) ** 2) / red
+    elif cost_flavour == 'L1':
+        return np.sum(np.abs(y - model))
+    elif cost_flavour == 'L1_error':
+        return np.sum(np.abs((y - model) / error))
+    elif (input_cost is not None) and cost_flavour == 'input':
+        # if a custom cost function is provided, use it
+        return input_cost(y, model, error)
+    else:
+        print(f"Unknown cost function flavor: {cost_flavour}. Returning None.")
+        return None
