@@ -53,10 +53,21 @@ $$
 $$
 
 - `mean` : Mean of the magnitude values.
+
 $$\text{Mean} (\bar{x}) = \frac{1}{N} \sum_{i=1}^{N} x_i$$
+
 - `mean_err`:  average uncertainty in magnitudes
+
 - `weighted_average`: Weighted average of the magnitude values.
+
+  $$\text{Weighted Mean} (\bar{x}_w) = \frac{\sum_{i=1}^{N} w_i x_i}{\sum_{i=1}^{N} w_i}$$
+
 - `median`: Median of the magnitude values.
+
+$$\text{Median} = \begin{cases}
+x_{\left(\frac{n+1}{2}\right)} & \text{if } n \text{ is odd} \\
+\frac{x_{\left(\frac{n}{2}\right)} + x_{\left(\frac{n}{2}+1\right)}}{2} & \text{if } n \text{ is even}
+\end{cases}$$
 - `min`: Minimum value of the magnitudes.
 - `max`: Maximum value of the magnitudes.
 - `time_max`: Maximum value of the observation times.
@@ -160,17 +171,49 @@ you are expected to pass in a `LightCurve` object, or a `FoldedLightCurve` objec
 ### 'Usual' Variability indexes:
 
 - Shapriro-Wilk test
-- MAD
+
+$$W = \frac{\left(\sum_{i=1}^{n} a_i x_{(i)}\right)^2}{\sum_{i=1}^{n} (x_i - \bar{x})^2}$$
+
+Where $W$ is the Shapiro-Wilk statistic, $n$ is the number of observations, $x_i$ are the individual values of the dataset, $\bar{x}$ are the mean (average) of the dataset, and 
+ $x_{(i)}$ are the $i$-th order statistic in the sorted dataset. The coefficients $a_i$
+  are pre-calculated constants based on the sample size and are used in the Shapiro-Wilk test.
+
+- median absolute deviation (MAD)
+  $$\text{MAD} = \text{median} \left( \left| x_i - \text{median}(x) \right| \right)$$
+
 - $\Chi^2$
+$$\chi^2 = \sum_{i=1}^{k} \frac{(O_i - E_i)^2}{E_i}$$
+
+with $\chi^2$ as the chi-squared statistic, $O_i$ is the observed frequency for each category or bin, $ E_i$ is the expected frequency for each category or bin, and $k$ are the total number of categories or bins.
+
 - reduced- $\Chi^2$
-- Interquirtile range
+
+$\chi_\nu^2 = \frac{\chi^2}{\nu}$, where $\nu$ are the degrees of freedom
+
+- Inter-quantitle  range (IRQ)
+$$\text{IQR} = Q_3 - Q_1$$
+Where $Q_1$ and $Q_3$ are the first and third quartile
+
 -  Robust-Median Statistics (RoMS)
+
+$$\text{Robust-Median} = \text{median}(|x_i - \text{median}(x)|)
+$$
+
 -  normalisedExcessVariance
--  Lag1AutoCorr
--  
+
+
+$$\sigma_{\text{NXS}}^2 = \frac{S^2 - \langle \epsilon^2 \rangle}{\langle x \rangle^2}$$
+
+-  Lag1AutoCorr ($l_1$)
+
 -  andersonDarling
+  $$A^2 = -n - \frac{1}{n} \sum_{i=1}^{n} \left[ \frac{2i - 1}{n} \cdot \ln\left( F(X_{(i)}) \right) + \left( 1 - \frac{2i - 1}{n} \right) \cdot \ln\left( 1 - F(X_{(n-i+1)}) \right) \right]$$
+Where $A^2$ is the Anderson-Darling statistics, $n$ is the number of observations, $X_{(i)}$ is the $i$-th order statistic in the sorted dataset and $F(X_{(i)})$  is the empirical distribution function at $X_{(i)}$.
 -  skewness
+$$\text{Skewness} = \frac{\frac{1}{n} \sum_{i=1}^{n} (x_i - \bar{x})^3}{\left(\frac{1}{n} \sum_{i=1}^{n} (x_i - \bar{x})^2\right)^{\frac{3}{2}}}$$
 -  kurtosis
+$$\text{Kurtosis} = \frac{\frac{1}{n} \sum_{i=1}^{n} (x_i - \bar{x})^4}{\left(\frac{1}{n} \sum_{i=1}^{n} (x_i - \bar{x})^2\right)^2}$$
+
 
 ### Normalized peak-to-peak variability
 
@@ -185,7 +228,27 @@ where $m_i$ is the magnitude measurement and $\sigma_i$ is the corresponding mea
 
 ### `VariabilityIndex.M_index`
 
+$$M = \frac{<m_{10\%}>-m_{med}}{\sigma_m}$$
+
+$<m_{10\%}>$ is all the data in the top and bottom decile of the light-curve. 
+Not that there are conflicting definitions in the literature, where $\sigma_m$ is sometimes the overall rms of the light-curve and sometimes its standard-deviation! Here I am using the second one. 
+
 ### `VariabilityIndex.Q_index`
+
+$$Q = \frac{\sigma_\mathrm{res}^2-\sigma_\mathrm{phot}^2}{\sigma^2_\mathrm{raw}-\sigma^2_\mathrm{phot}}$$, 
+
+where:
+- $\sigma_\mathrm{res}^2$ and $\sigma^2_\mathrm{raw}$ are the ~rms~ variance values of the raw light curve and the phase-subtracted light curve.
+- $\sigma_\mathrm{raw}^2$ is the variance of the original light-curve
+- $\sigma_\mathrm{phot}$ is the mean photometric error
+
+
+1. Find a period (Lomb Scargle Periodogram for ex)
+2. Fold the light curve to the period
+3. Use mooving average to get the smoothed shape of the curve
+4. subtract it from phased light curve 
+5. estimnate $\sigma_\mathrm{res}$
+
 
 ### `gaia_AG_proxy`
 
