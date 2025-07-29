@@ -227,12 +227,14 @@ class LightCurve:
     @property
     def SNR(self):
         """
-        Returns the signal-to-noise ratio of the light curve.
+        Returns the signal-to-noise ratio of the light curve
+        defined as the ratio between the standard deviation of the magnitudes
+        and the average uncertainty.
 
         Returns:
             float: Signal-to-noise ratio.
         """
-        return np.sqrt(np.sum((self.mag - self.mean)**2)/np.sum(self.err**2))
+        return self.std/self.mean_err
     
     def _list_properties(self):
         """
@@ -339,6 +341,9 @@ class FoldedLightCurve(LightCurve):
         """
         Derives the waveform and update the residual curve
         """
+        # print('Debugging FoldedLightCurve._get_waveform()')
+        # print(f'Waveform type: {self._waveform_type}')
+        # print(f'Waveform params: {self._waveform_params}')
         wf = WaveForm(self.phase, self.mag_phased)
         self.waveform = wf.get_waveform(
             waveform_type=self._waveform_type,
