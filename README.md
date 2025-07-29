@@ -1,9 +1,9 @@
 # A Python package for deriving variability features from any kind of light-curves
 
-**@juliaroquette** Package under development for deriving Q&M indexes (and a few other variability indexes) for any time type of light-curves.
+**@juliaroquette** Package under development for deriving Q&M indexes (and a few other variability indexes) for any time type of light-curves. 
 
 
-**Last Update**: 11th July 2025
+**Last Update**: 29th July 2025
 
 In this current version, one can import and use it by doing:
 
@@ -12,17 +12,30 @@ import sys
 sys.path.append('PAT/TO/THE/PACKAGE/LOCATION')  
 ```
 
-
+TO DO:
+<details>
+- :white_large_square: Proper packaging
+- :white_large_square: Proper installation tutorial
+</details>
 
 # `lightcurve` module:
 
-Provides tools for loading light-curves as objects. Three distinct classes related to light-curves are currently included:
+Provides tools for loading light-curves as objects. Three distinct classes related to light-curves are currently included: 
+- `LightCurve`s are the simplest light-curves
+- `FoldedLightCurve`s are phase-folded light-curves with a known timescale
+- `SyntheticLightCurve` (under construction) provide a suite of models of light-curves for different variability modes and survey fingerprints. 
+
+Throughout this documentation, we approach an observed light-curve as:
+
+$$x_i = x(t_i) + a(t_i) + \sigma_{i},$$
+
+where $x_i$ is the $i$-th observation at the time $t_i$, $\{x(t_i)\}$ are snapshots of a time-dependent signal at the time $t_i$ (or the primary signal in the light-curve),  $\{a(t_i)\}$ is any secondary signal,  $\sigma_{i}$ is the photometric uncertainty for the $i$-th observation.
 
 For example, let's consider the following light-curve:
 
 ````python
 import numpy as np
-N = 100
+N = 100 
 time = np.linspace(0, 80, N)
 err =  0.01 * np.random.random_sample(N)
 period = 10. 
@@ -45,36 +58,47 @@ Where the attributes `time`, `mag`, and `err` are numpy-arrays with the same len
 
 `LightCurve` objects have a series of properties:
 - `N` : Number of datapoints in the light curve.
-- `time_span`: Total time-span of the light curve ($t_{max}-t_{min}$).
-- `std`: (bias-corrected) Standard deviation of the magnitude values.
-
+- `std`: Standard deviation of the magnitudes [(uses bias corrected `numpy.std`)](https://numpy.org/doc/stable/reference/generated/numpy.std.html).
 $$
-\text{Standard Deviation} (\sigma) = \sqrt{\frac{1}{N-1} \sum_{i=1}^{N} (x_i - \bar{x})^2}
+\sigma = \sqrt{\frac{1}{N-1} \sum_{i=1}^{N} (x_i - \bar{x})^2}
 $$
 
-- `mean` : Mean of the magnitude values.
+- `mean` : simple average of the magnitudes.
 
-$$\text{Mean} (\bar{x}) = \frac{1}{N} \sum_{i=1}^{N} x_i$$
+$$\bar{x} = \frac{1}{N} \sum_{i=1}^{N} x_i$$
 
-- `mean_err`:  average uncertainty in magnitudes
+- `mean_err`:  average uncertainty in magnitudes (or typical uncertainty)
+
+$$\sigma_{phot} = \frac{1}{N} \sum_{i=1}^{N} \sigma_i$$
+
 
 - `weighted_average`: Weighted average of the magnitude values.
 
-  $$\text{Weighted Mean} (\bar{x}_w) = \frac{\sum_{i=1}^{N} w_i x_i}{\sum_{i=1}^{N} w_i}$$
+$$\bar{x}_w = \frac{\sum_{i=1}^{N} w_i x_i}{\sum_{i=1}^{N} w_i}$$
 
-- `median`: Median of the magnitude values.
+where $w_i=\frac{1}{\sigma_i^2}$. Uses [`numpy.average`](https://numpy.org/doc/stable/reference/generated/numpy.average.html#numpy.average).
+
+- `median`: Median of magnitudes.
 
 $$\text{Median} = \begin{cases}
 x_{\left(\frac{n+1}{2}\right)} & \text{if } n \text{ is odd} \\
 \frac{x_{\left(\frac{n}{2}\right)} + x_{\left(\frac{n}{2}+1\right)}}{2} & \text{if } n \text{ is even}
 \end{cases}$$
+
+Uses [`np.median`](https://numpy.org/doc/stable/reference/generated/numpy.nanmedian.html#numpy.nanmedian)
 - `min`: Minimum value of the magnitudes.
 - `max`: Maximum value of the magnitudes.
-- `time_max`: Maximum value of the observation times.
-- `time_min`: Minimum value of the observation times.
 - `ptp`: Peak-to-peak amplitude of the magnitude values. Defined as the difference between the median values for the datapoints in the 5% outermost tails of the distribution.
-- `SNR` signal-to-noise ratio (average standard deviation divided by average uncertainty)
-- `range` 
+- `time_max`: Maximum value of the observation times ($t_{max}$).
+- `time_min`: Minimum value of the observation times ($t_{min}$).
+- `time_span`: Total time-span of the light curve
+ $$t_{max}-t_{min}$$ 
+- `range`: another flavor of ptp amplitude bin in terms of maximum/minimum values of magnitude: $$x_{max}-x_{min}$$ 
+- `SNR` signal-to-noise ratio (standard deviation of the data divided by average uncertainty)
+
+$$\text{SNR}=\frac{\sigma}{\sigma_{phot}}$$
+
+
 
 ## `FoldedLightCurve` class
 
@@ -166,7 +190,7 @@ var = VariabilityIndex(lc_p, timescale=period)
 
 you are expected to pass in a `LightCurve` object, or a `FoldedLightCurve` object. However,  **note that some variability indexes, like the Q-index itself, require either a `timescale` argument or a `FoldedLightCurve` instance (which already have an instance `timescale`).
 
-<details>
+
 
 ### 'Usual' Variability indexes:
 
@@ -248,17 +272,19 @@ where:
 5. estimnate $\sigma_\mathrm{res}$
 
 
-### `gaia_AG_proxy`
-
-
-
-</details>
-
 
 ## TO DO list
-- :white_large_square: **@juliaroquette** Implement the Abbe variability index into `indexes.py`
+
+<details>
+- :white_large_square: Fix Stetson-index implementation
+- :white_large_square: Complete Variability-index documentation
+  - :white_large_square: Complete description
+  - :white_large_square: add examples
+  - :white_large_square: add references
+</details>
 
 # `filtering
+
 **@juliaroquette** mostly implemented, but still needs polishing and debugging. 
 
 
