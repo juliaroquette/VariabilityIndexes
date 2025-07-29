@@ -1,4 +1,4 @@
-# A Python package for estimating variability features from any kind of light-curves
+# A Python package for deriving variability features from any kind of light-curves
 
 **@juliaroquette** Package under development for deriving Q&M indexes (and a few other variability indexes) for any time type of light-curves.
 
@@ -12,7 +12,7 @@ import sys
 sys.path.append('PAT/TO/THE/PACKAGE/LOCATION')  
 ```
 
-[_TOC_]
+
 
 # `lightcurve` module:
 
@@ -46,8 +46,14 @@ Where the attributes `time`, `mag`, and `err` are numpy-arrays with the same len
 `LightCurve` objects have a series of properties:
 - `N` : Number of datapoints in the light curve.
 - `time_span`: Total time-span of the light curve ($t_{max}-t_{min}$).
-- `std`: Standard deviation of the magnitude values.
+- `std`: (bias-corrected) Standard deviation of the magnitude values.
+
+$$
+\text{Standard Deviation} (\sigma) = \sqrt{\frac{1}{N-1} \sum_{i=1}^{N} (x_i - \bar{x})^2}
+$$
+
 - `mean` : Mean of the magnitude values.
+$$\text{Mean} (\bar{x}) = \frac{1}{N} \sum_{i=1}^{N} x_i$$
 - `mean_err`:  average uncertainty in magnitudes
 - `weighted_average`: Weighted average of the magnitude values.
 - `median`: Median of the magnitude values.
@@ -91,7 +97,7 @@ All returned values are sorted as a function of phase value.
 
 
 ## `SyntheticLightCurve`
-
+<details>
 **@juliaroquette** Still under implementation, will allow to generate synthetic light-curves for given observational windows. 
 
 ```python 
@@ -101,7 +107,6 @@ from variability.lightcurve import FoldedLightCurve
 
 ## TO DO list
 
-<details>
 
 
 
@@ -148,17 +153,44 @@ from variability.indexes import VariabilityIndex
 var = VariabilityIndex(lc_p, timescale=period)
 ```
 
-you are expected to pass in a `LightCurve` object, or a `FoldedLightCurve` object. 
-
-**Note that some variability indexes, like the Q-index itself, require either a `timescale` argument or a `FoldedLightCurve` instance (which already have an instance `timescale`).
-
+you are expected to pass in a `LightCurve` object, or a `FoldedLightCurve` object. However,  **note that some variability indexes, like the Q-index itself, require either a `timescale` argument or a `FoldedLightCurve` instance (which already have an instance `timescale`).
 
 <details>
+
+### 'Usual' Variability indexes:
+
+- Shapriro-Wilk test
+- MAD
+- $\Chi^2$
+- reduced- $\Chi^2$
+- Interquirtile range
+-  Robust-Median Statistics (RoMS)
+-  normalisedExcessVariance
+-  Lag1AutoCorr
+-  
+-  andersonDarling
+-  skewness
+-  kurtosis
+
+### Normalized peak-to-peak variability
+
+`norm_ptp`
+
+Sokolovsky et al. (2017):
+$$
+\nu = \frac{(m_i-\sigma_i)_\mathrm{max} - (m_i-\sigma_i)_\mathrm{min}}{(m_i+\sigma_i)_\mathrm{max} + (m_i+\sigma_i)_\mathrm{min}}
+$$
+
+where $m_i$ is the magnitude measurement and $\sigma_i$ is the corresponding measurement error. 
+
 ### `VariabilityIndex.M_index`
 
 ### `VariabilityIndex.Q_index`
 
 ### `gaia_AG_proxy`
+
+
+
 </details>
 
 
@@ -257,6 +289,18 @@ Once a waveform has been derived, a residual light curve can be estimated as:
 ```python
 residuals = wf.residual_magnitude(waveform)
 ```
+
+# `timescale` module:
+
+```python
+from variability.timescale import  TimeScale
+```
+
+The `TimeScale` class allows to quick estimation of variability light curves for either a trio of (`time, mag, err`) or an object `LightCurve`. There are two types of timescale estimator currently implemented:
+
+- Periodic Timescale:
+- Aperiodic timescale: 
+
 
 
 ## TO DO list
