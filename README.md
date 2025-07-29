@@ -220,9 +220,7 @@ $$\text{Kurtosis} = \frac{\frac{1}{n} \sum_{i=1}^{n} (x_i - \bar{x})^4}{\left(\f
 `norm_ptp`
 
 Sokolovsky et al. (2017):
-$$
-\nu = \frac{(m_i-\sigma_i)_\mathrm{max} - (m_i-\sigma_i)_\mathrm{min}}{(m_i+\sigma_i)_\mathrm{max} + (m_i+\sigma_i)_\mathrm{min}}
-$$
+$$\nu = \frac{(m_i-\sigma_i)_\mathrm{max} - (m_i-\sigma_i)_\mathrm{min}}{(m_i+\sigma_i)_\mathrm{max} + (m_i+\sigma_i)_\mathrm{min}}$$
 
 where $m_i$ is the magnitude measurement and $\sigma_i$ is the corresponding measurement error. 
 
@@ -235,7 +233,7 @@ Not that there are conflicting definitions in the literature, where $\sigma_m$ i
 
 ### `VariabilityIndex.Q_index`
 
-$$Q = \frac{\sigma_\mathrm{res}^2-\sigma_\mathrm{phot}^2}{\sigma^2_\mathrm{raw}-\sigma^2_\mathrm{phot}}$$, 
+$$Q = \frac{\sigma_\mathrm{res}^2-\sigma_\mathrm{phot}^2}{\sigma^2_\mathrm{raw}-\sigma^2_\mathrm{phot}}$$ 
 
 where:
 - $\sigma_\mathrm{res}^2$ and $\sigma^2_\mathrm{raw}$ are the ~rms~ variance values of the raw light curve and the phase-subtracted light curve.
