@@ -142,9 +142,6 @@ from variability.lightcurve import FoldedLightCurve
 
 ## TO DO list
 
-
-
-
 :white_large_square: **@juliaroquette** It may be worth it consider the possibility of merging `LightCurve` and `FoldedLightCurve` into a single class. <- Consider that after the `timescale.py` package has been implemented. 
 
 :white_large_square: read observational windows from file
@@ -176,9 +173,14 @@ from variability.lightcurve import FoldedLightCurve
   - :white_large_square: Function that convolves the waveform to an observational window
 </details>
 
-# `indexes`
 
-## `VariabilityIndex``
+# Variability Indexes
+
+Include a suite of widely used variability indexes. 
+
+## `indexes`
+
+
 
 To instantiate a `VariabilityIndex` object:
 
@@ -283,7 +285,9 @@ where:
   - :white_large_square: add references
 </details>
 
-# `filtering
+# Filtering
+
+Include a suite of filters to aid pre-processing light-curves. Most importantly, the `WaveForm` class provides a waveform estimation given the assumption of a periodic timescale of variability. 
 
 **@juliaroquette** mostly implemented, but still needs polishing and debugging. 
 
@@ -376,8 +380,10 @@ Once a waveform has been derived, a residual light curve can be estimated as:
 ```python
 residuals = wf.residual_magnitude(waveform)
 ```
+# Variability timescale 
 
-# `timescale` module:
+
+## `timescale` module:
 
 ```python
 from variability.timescale import  TimeScale
@@ -388,11 +394,214 @@ The `TimeScale` class allows to quick estimation of variability light curves for
 - Periodic Timescale:
 - Aperiodic timescale: 
 
+## Structure functions
+
+The **Structure Functions (SF)** are used to examine the timescales of variability in a light curve. It quantifies how the magnitude differences between observations evolve as a function of time lag.
+
+#### **Definition**  
+
+There are a few different definitions of SF out there, but here we work with definition as in [Hughes92](https://ui.adsabs.harvard.edu/abs/1992ApJ...396..469H) where:  
+
+$$SF(\tau) = \frac{1}{N} \sum_{i,j} (m_i - m_j)^2, \,\, i>j$$
+
+where $N$ is the number of pairs separated by a time lag $\tau$, and $m_i - m_j$ is the magnitude difference for each pair.
+
+
+### **Key SF Properties**  
+
+For the moment,  the SF analysis implemented is restricted to light curves with an underlying assumption of aperiodic variability (i.e., a Lomb-Scargle periodogram analysis is carried out in a previous step and no significant period was found).
+
+Starting from this _aperiodic timescale_ hypothesis, we assume the structure function will have the form (`structure_function.model_function(x, t0, c0, c1)`):
+
+$$y_{SF}(\tau) = C_0 + C_1(1 - \exp{(-\tau/t_0)}),$$
+
+
+- At _small time lags_ ($\tau\rightarrow0$), the SF is dominated by measurement noise, which in this model is mapped to $C_0$
+- At _intermediate time lags_, the SF increases following a linear slope in log-scale
+- At _large time lags_ ($\tau\rightarrow t_{max}$), the SF saturates to a plateau ($C_0+C_1$). 
+- The transition between the SF increase and the plateau occurs at the turnover timescale, $t_0$, which here we interporet as the characteristic timescale in the light curve. 
+
+**Warnings:**
+
+- This model assumes aperiodic variability. Periodic variability will introduce significant substructure to the SF and is not well represented by this model (see, for example [Roelens17](https://ui.adsabs.harvard.edu/abs/2017MNRAS.472.3230R) Figure 1.). 
+- This model assumes there exist a dominant variability mode in the light-curve with a a timescale $t_{min}\leq t_s \leq t_{max}$. This model does not well represents multi-mode variability.
+
+### SF sampling
+
+Before fitting the SF model to the SF data. There may be a few complications behind sampling the data, which will depend of the specific light curve sampling. 
+
+
+#### unbinned
+
+The first step for sampling is to estimate the ${SF(\tau),\tau}$. This step is done by `structure_function.get_sf_time_lags(time, mag, err)`, and includes as a default the propagation of magnitude uncertainties into SF uncertainties.  
+
+*Why not simply fit the SF model to unbinned data?* Depending on the duration and cadence of the light-curve, the SF has many have many more points at longer time-lags. Consequently, when fitting the the SF model directly to the unbinned data, $SF(\tau)$ for large $\tau$ will have much more weight in the fit.
+
+#### Binned
+
+The alternative to unbinned data is _to bin_ the data while averaging the SF values within bins. Binning will thus smooth regions of the SF where the density of points is too large compared to not so well populated $\tau$-ranges. In many applications "binning is sinning". But in this case sinning allows avoiding biasing the SF fits towards larger timescales. 
+
+The function `adaptative_binning(time_lag, sf_values, sf_err=None)` includes different _flavours_ of binning. 
+
+All _flavours_ of binning share an euristic approach for picking the number of bins to use based on a desired timescale resolution. This is determined by the `resolution` keyword. 
+- In log scale (`log=True`) `resolution` ($\Delta_\tau$) should be in dex. The number of bins is then difined as:
+
+$$N = 1 + \left\lfloor \frac{\log_{10}(\text{max}(\tau))-\log_{10}(\text{min}(\tau))}{\Delta_\tau} \right\rfloor$$
+
+- in linear scale (`log=False`) `resolution` ($\Delta_\tau$) should be in the same units as $\tau$ (days)
+ 
+$$N = 1 + \left\lfloor \frac{\text{max}(\tau)-\text{min}(\tau)}{\Delta_\tau} \right\rfloor$$
+
+
+This calculation is done within the auxiliary function `bin_edges_and_centers(time_lag, resolution, log=True)`, which supports the binning processing by properly deriving the number of bins and making sure the edge values of $\tau$ are the center of the last bins. 
+
+**what resolution to use**?
+
+For example, relatively well sampled SF around timescale related to rotational modulation in young stars, we may want to have timebins 0.5 days appart at a $\tau=10$ d
+
+$$\log_{10}{(10 + 0.5)} - \log_{10}{(10)} \approx 0.02\,\text{dex}$$
+
+ which results on $N_{bins}=240$
+
+##### regular bins
+
+Simple regular bins will be problematic for most light curves because some SF bins will be empty, and others will not have enough data to average. Still for comparison and completeness, the `adaptative_binning` function will yield regular bins if `adaptative_binning(time_lag, sf_values, hybrid=False, bin_min_size=1, max_bin_exp_factor=1.0`)
+
+#####  Adaptative Binning
+
+Bins are adapted according to some criteria.
+
+`structure_function.adaptative_binning(time_lag, sf_values, sf_err=None,
+                       log=True,
+                       hybrid=False,
+                       bin_min_size=5, 
+                       max_bin_exp_factor=3.0, 
+                       step_size=0.2, 
+                       resolution=0.02)`
+
+###### Expanded bins 
+
+Bins are expanded around its centre until either it is composed by minimum number of data-points (`bin_min_size`) or it is completely merged with its two imediate neighbours.
+This is similar to the approach in [Roelens17](https://ui.adsabs.harvard.edu/abs/2017MNRAS.472.3230R) where a tolerance factor $\epsilon_i$ introduced to ensure that each bin contains enough pairs for reliable calculation. 
+
+The maximum expansion allowed is set by `max_bin_exp_factor` which should be a value between `1.0` and `3.0` where:
+
+- `max_bin_exp_factor=1` allows for no expansion (bins are fixed), 
+- `max_bin_exp_factor=3.0` means 3 bins are merged (the one in question and each of its imediate bins)
+- `max_bin_exp_factor=2.0` means the bin is expanded until half of their neighour bins.
+
+Additionally, `step_size` sets the size of the expansion step, where:
+- `step_size=0.05` is the minimum value allowed and sets a 2.5% expansion to each direction at each iteration
+- `step_size=1.0` is the maximum and it means the bin grows 50% to each direction. 
+
+If `bin_min_size` is never reached, the bin is discarded. In this context, `pair_counts` return the number of sources per bin, while `irregular_bin=0.0` if this was a regular bin, `irregular_bin=-1.0` if using individual pairs and `>0.0` it reflects final width of the bin after expansion. 
+
+For example: `adaptative_binning(time_lag, sf_values, sf_err=None, hybrid=False, bin_min_size=5, max_bin_exp_factor=3.0, step_size=0.2)` will expand bins until either the bin is merged with its immediate neighbours or at least `bin_min_size=5` are within the bin, while gradually expanding bins by 20% of their width. 
+
+###### Hybrid mode
+
+For bins where the number of sources is lower than `bin_min_size`, the data points in that bin are appended rather than their average. `adaptative_binning(time_lag, sf_values, sf_err=None, hybrid=True, bin_min_size=5)` will count indivual points in bins with less than ` bin_min_size=5` sources. (see note on treatment of uncertainty)
+
+
+##### Log/linear scale:
+
+Binning can be done in either log (`log=True`) or linear scale (`log=False`). However note that the linear case won't work well for SF where $\tau$ covers too many orders of timescale, such as the use of linear binning will squeeze all small $\tau$ into a few bins. 
+
+##### treatment of uncertainty
+
+- When `sf_err=sf_error` uncertainty is propagated (from the photometric uncertainties) from the SF into the bins as  $\Delta \text{SF}_{bin} = \frac{\sqrt{\sum \sigma_{SF}^2}}{N}$. However, this will often underestimate uncertainties and bias SF-fits.
+
+- when `sf_err=None` uncertainties will be ignored and the bin uncertainty will be estimated from the spread in the bin as $\Delta \text{SF}_{bin} = \frac{\sigma_{SF_{bin}}}{\sqrt{N}}$.
+  - When hybrid mode is also used (`sf_err=None, hybrid=True`), the median absolute deviation of the whole set of `sf_values` is used rather than the SF propagate uncertainties: $\Delta \text{SF}_{ind} = 1.4826\times\text{median}(|SF-\tilde{SF}|)$. 
+
+### SF-Fitting 
+
+The fitting function, $ y_{SF}(\tau)$, was defined above. For fitting it to the SF data, we are using the MINUIT optimisation tool from CERN. 
+
+- [MINUIT reference manual](https://root.cern.ch/download/minuit.pdf)  
+- [iminuit library](https://scikit-hep.org/iminuit/)
+
+Minuit is just a minimisation function and will use whatever a function (`cost_function_for_minuit`) I pass `m=Minuit(cost_function_for_minuit)`. Here I simply adapted Chloé's `fit_with_minuit` to take the refactored `cost_function`. 
+
+
+#### Cost-functions for minimization:
+
+- $y(\tau)$ is the SF data, with $t_i$ the SF data-point at the i-th $\tau$.
+- $\sigma_i$ is the uncertainty/error at the i-th SF data point.
+- $\sigma_y$ is the standard deviation for the full SF dataset
+- $m\rightarrow y_\text{SF}$ is the model assumed for the SF
+
+
+##### L2 (simple residual)
+
+This is a simple for minimizing residuals. Can work well enough for minimization, but it does not take noise into consideration and it is is not really a statistical likehood function. It will work well only as long as the errors are regular/well-behaved (gausian)
+
+$$\chi^2_\mathrm{L2} = \sum_{i} \bigl(y_i - m_i\bigr)^2.$$ 
+
+$$\chi^2_\mathrm{L2,log} = \sum_{i} \bigl(\log_{10}(y_i) - \log_{10}(m_i)\bigr)^2.$$ 
+
+##### L2 weighted by error ($\chi^2$):
+
+This is the usual $\chi^2$ definition. Though it works well if errors are gaussian. If uncertainties are weird, which seems to be the case here, may not be the best.
+
+$$\chi^2_\mathrm{L2,error} = \sum_{i} \left( \frac{y_i - m_i}{\sigma_i} \right)^2$$
+  
+
+##### L2 with error in log-scale
+
+In log-scale, $y\rightarrow\log_{10}(y)$, but error needs to be properly propagated. Note that log-scale overweights the small lags (uncertainty propagation gets super weird for small y).
+
+
+$$\sigma_{\log y,i} = \frac{\sigma_i}{y_i \ln 10}$$
+
+$$
+\chi^2_\mathrm{L2, error,log} = \sum_{i} \left( \frac{\log_{10}(y_i) - \log_{10}(m_i)}{\sigma_{\log y,i}} \right)^2.$$
+
+##### Reduced $\chi^2$
+
+For reduced-\Chi^2:
+
+$$\chi_{red}^2 = \frac{\chi^2}{N-k}$$
+
+Where $N$ is the number of datapoints in $y$ and $k$ is the number of fitting parameters in the model. In our case here $k=3$ since we have the parameters $(C_0, C_1, t_0)$. 
+
+This reduced form allows to at least evaluate how bad the errors are, as we should have:
+
+- $\chi_{red}^2\approx 1$ for good fits
+- $\chi_{red}^2\gg 1$ for underfit with error likely understimated
+- $\chi_{red}^2\ll 1$ for overfit with overestimated errors 
+
+  
+##### L1 norm:
+
+The L1 norm offers an alternative where the residuals are not squared such as the cost-function is less penalised by outliers. 
+
+$$\text{L1}= \sum_{i} \bigl|y_i - m_i\bigr|$$ 
+
+
+
+##### L1 norm w/ error 
+
+Similarly to the L2 version, we can weight it by uncertainties. Noting that similarly to the L2 version this will work well as long as the uncertainties are good estimates of the real uncertainty. 
+
+$$
+\text{L1}_{\text{error}} = \sum_{i=1}^{N} \frac{\lvert y_i - m_i \rvert}{\sigma_i}
+$$
+
+
+##### L1 norm log-scale w/error:
+
+To deal with the several orders of magnitude covered by both SF and $\tau$, logscale is a good option, though it may overweight small lags
+
+$$
+\text{L1}_{\text{log,weighted}} = \sum_{i=1}^{N} \frac{\lvert \log_{10}(y_i) - \log_{10}(m_i) \rvert}{\dfrac{\sigma_i}{y_i \ln(10)}}
+$$
 
 
 ## TO DO list
 - :heavy_check_mark: **@juliaroquette** Polish Lomb Scargle 
-- :white_large_square: **@juliaroquette** Add Structure function (@Clhoe)
+- :white_large_square: **@juliaroquette** Add Structure function 
+- :white_large_square: Include alternative fitting to iminuit?
 <!-- - :white_large_square: **@juliaroquette**  -->
 <!-- - :white_large_square: **@juliaroquette**  -->
 
