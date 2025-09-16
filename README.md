@@ -196,7 +196,7 @@ you are expected to pass in a `LightCurve` object, or a `FoldedLightCurve` objec
 
 ### 'Usual' Variability indexes:
 
-- Shapriro-Wilk test
+#### Shapriro-Wilk test
 
 $$W = \frac{\left(\sum_{i=1}^{n} a_i x_{(i)}\right)^2}{\sum_{i=1}^{n} (x_i - \bar{x})^2}$$
 
@@ -204,15 +204,15 @@ Where $W$ is the Shapiro-Wilk statistic, $n$ is the number of observations, $x_i
  $x_{(i)}$ are the $i$-th order statistic in the sorted dataset. The coefficients $a_i$
   are pre-calculated constants based on the sample size and are used in the Shapiro-Wilk test.
 
-- median absolute deviation (MAD)
+#### median absolute deviation (MAD)
   $$\text{MAD} = \text{median} \left( \left| x_i - \text{median}(x) \right| \right)$$
 
-- $\Chi^2$
+#### $\Chi^2$
 $$\chi^2 = \sum_{i=1}^{k} \frac{(O_i - E_i)^2}{E_i}$$
 
 with $\chi^2$ as the chi-squared statistic, $O_i$ is the observed frequency for each category or bin, $ E_i$ is the expected frequency for each category or bin, and $k$ are the total number of categories or bins.
 
-- reduced- $\Chi^2$
+#### reduced-$\Chi^2$
 
 $\chi_\nu^2 = \frac{\chi^2}{\nu}$, where $\nu$ are the degrees of freedom
 
@@ -220,24 +220,24 @@ $\chi_\nu^2 = \frac{\chi^2}{\nu}$, where $\nu$ are the degrees of freedom
 $$\text{IQR} = Q_3 - Q_1$$
 Where $Q_1$ and $Q_3$ are the first and third quartile
 
--  Robust-Median Statistics (RoMS)
+#### Robust-Median Statistics (RoMS)
 
 $$\text{Robust-Median} = \text{median}(|x_i - \text{median}(x)|)
 $$
 
--  normalisedExcessVariance
+#### normalisedExcessVariance
 
 
 $$\sigma_{\text{NXS}}^2 = \frac{S^2 - \langle \epsilon^2 \rangle}{\langle x \rangle^2}$$
 
--  Lag1AutoCorr ($l_1$)
+#### Lag1AutoCorr ($l_1$)
 
--  andersonDarling
+####  andersonDarling
   $$A^2 = -n - \frac{1}{n} \sum_{i=1}^{n} \left[ \frac{2i - 1}{n} \cdot \ln\left( F(X_{(i)}) \right) + \left( 1 - \frac{2i - 1}{n} \right) \cdot \ln\left( 1 - F(X_{(n-i+1)}) \right) \right]$$
 Where $A^2$ is the Anderson-Darling statistics, $n$ is the number of observations, $X_{(i)}$ is the $i$-th order statistic in the sorted dataset and $F(X_{(i)})$  is the empirical distribution function at $X_{(i)}$.
--  skewness
+#### skewness
 $$\text{Skewness} = \frac{\frac{1}{n} \sum_{i=1}^{n} (x_i - \bar{x})^3}{\left(\frac{1}{n} \sum_{i=1}^{n} (x_i - \bar{x})^2\right)^{\frac{3}{2}}}$$
--  kurtosis
+####  kurtosis
 $$\text{Kurtosis} = \frac{\frac{1}{n} \sum_{i=1}^{n} (x_i - \bar{x})^4}{\left(\frac{1}{n} \sum_{i=1}^{n} (x_i - \bar{x})^2\right)^2}$$
 
 
