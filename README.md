@@ -207,16 +207,16 @@ Where $W$ is the Shapiro-Wilk statistic, $n$ is the number of observations, $x_i
 #### median absolute deviation (MAD)
   $$\text{MAD} = \text{median} \left( \left| x_i - \text{median}(x) \right| \right)$$
 
-#### $\Chi^2$
+#### $\chi^2$
 $$\chi^2 = \sum_{i=1}^{k} \frac{(O_i - E_i)^2}{E_i}$$
 
 with $\chi^2$ as the chi-squared statistic, $O_i$ is the observed frequency for each category or bin, $ E_i$ is the expected frequency for each category or bin, and $k$ are the total number of categories or bins.
 
-#### reduced-$\Chi^2$
+#### reduced-$\chi^2$
 
 $\chi_\nu^2 = \frac{\chi^2}{\nu}$, where $\nu$ are the degrees of freedom
 
-- Inter-quantitle  range (IRQ)
+#### Inter-quantitle  range (IRQ)
 $$\text{IQR} = Q_3 - Q_1$$
 Where $Q_1$ and $Q_3$ are the first and third quartile
 
