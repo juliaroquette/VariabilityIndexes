@@ -63,9 +63,9 @@ class VariabilityIndex:
             warn("Q-index is only available for folded light-curves")
             self.Q_index = None
         else:
-            Q_waveform_type = kwargs.get('waveform_type', 'uneven_savgol')
-            Q_waveform_params = kwargs.get('waveform_params', {})
-            self.Q_index = self.Q_index(parent=self, waveform_type=Q_waveform_type, waveform_params=Q_waveform_params)
+            # Q_waveform_type = kwargs.get('waveform_type', 'uneven_savgol')
+            # Q_waveform_params = kwargs.get('waveform_params', {})
+            self.Q_index = self.Q_index(parent=self)#, waveform_type=Q_waveform_type, waveform_params=Q_waveform_params)
 
     class M_index:
         def __init__(self, parent, percentile=10., is_flux=False):
@@ -133,13 +133,20 @@ class VariabilityIndex:
         return ss.median_abs_deviation(self.lc.mag, nan_policy='omit')
 
     @property
-    def chisquare(self):
-        return ss.chisquare(self.lc.mag)[0]
+    def chiSquare(self):
+        """
+        Raw Chi-square value
+        """
+        return np.sum((self.lc.mag - self.lc.weighted_average)**2 / self.lc.err**2)
 
     @property
     def reducedChiSquare(self):
-        return np.sum((self.lc.mag - self.lc.weighted_average)**2/self.lc.err**2)/np.count_nonzero(
-                           ~np.isnan(self.lc.mag)) - 1
+        """
+        Reduced Chi-square value:
+        raw chi-square divided by the number of degrees of freedom (N-1)
+        """
+        return self.chisquare/(np.count_nonzero(
+                           ~np.isnan(self.lc.mag)) - 1)
     
     @property
     def IQR(self):
@@ -153,13 +160,12 @@ class VariabilityIndex:
         """
         Robust-Median Statistics (RoMS)
         """
-        return np.sum(np.fabs(self.lc.mag - self.lc.median
-                              )/self.lc.err)/(self.lc.N - 1.)
+        return np.median(np.abs(self.lc.mag\
+            - np.median(self.lc.mag)))
     
     @property
     def normalisedExcessVariance(self):
-        return np.sum((self.lc.mag - np.nanmean(self.lc.mag))**2 - self.lc.err**2
-                      )/len(self.lc.mag)/np.nanmean(self.lc.mag)**2
+        return (self.lc.std**2 - self.lc.mean_err**2)/self.lc.mean**2
     
     @property
     def Lag1AutoCorr(self):
