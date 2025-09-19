@@ -44,61 +44,32 @@ import inspect
 import numpy as np
 import scipy.stats as ss
 from warnings import warn
+from variability.lightcurve import LightCurve, FoldedLightCurve
+
 
 class VariabilityIndex:
     def __init__(self, lc, **kwargs):
-        from variability.lightcurve import LightCurve, FoldedLightCurve
         if not isinstance(lc, LightCurve):
             raise TypeError("lc must be an instance of LightCurve")
-        self.lc = lc
-        
+        self.lc = lc        
+
+
+    @property
+    def periodicity_index(self, **kwargs):
+        if not isinstance(self.lc, FoldedLightCurve):
+            # warn("Q-index is only available for folded light-curves")
+            return None
+        else:
+            return PeriodicityIndex(parent=self)
+    
+    @property
+    def asymmetry_index(self, **kwargs):
         # calculate M-index
         M_percentile = kwargs.get('M_percentile', 10.)
         M_is_flux = kwargs.get('M_is_flux', False)
-        self.asymmetry_index = self.asymmetry_index(parent=self,percentile=M_percentile, is_flux=M_is_flux)
+        return AsymmetryIndex(parent=self,percentile=M_percentile, is_flux=M_is_flux).value
 
-        # calculate Q-index
-        if not isinstance(self.lc, FoldedLightCurve):
-            warn("Q-index is only available for folded light-curves")
-            self.periodicity_index = None
-        else:
-            # Q_waveform_type = kwargs.get('waveform_type', 'uneven_savgol')
-            # Q_waveform_params = kwargs.get('waveform_params', {})
-            self.periodicity_index = self.periodicity_index(parent=self)#, waveform_type=Q_waveform_type, waveform_params=Q_waveform_params)
-
-    class asymmetry_index:
-        def __init__(self, parent, percentile=10., is_flux=False):
-            #default
-            self._percentile = percentile
-            self.is_flux = is_flux
-            self.parent = parent
-
-        @property
-        def percentile(self):
-            """ 
-            Percentile used to calculate the M-index 
-            """
-            return self._percentile
-	
-        @percentile.setter
-        def percentile(self, new_percentile):
-            if (new_percentile > 0) and (new_percentile < 49.):
-                self._percentile = new_percentile
-            else:
-                raise ValueError("Please enter a valid percentile (between 0. and 49.)")
-
-        @property
-        def get_percentile_mask(self):
-            return (self.parent.lc.mag <= \
-                                np.percentile(self.parent.lc.mag, self._percentile))\
-                               | (self.parent.lc.mag >= \
-                                  np.percentile(self.parent.lc.mag, 100 - self._percentile))
-                               
-        @property
-        def value(self):
-            return (1 - 2*int(self.is_flux))*(np.mean(self.parent.lc.mag[self.get_percentile_mask]) - self.parent.lc.median)/self.parent.lc.std
-    
-    @property    
+    # @property    
     def Abbe(self):
         """
         Calculate Abbe value as in Mowlavi 2014A%26A...568A..78M
@@ -129,14 +100,20 @@ class VariabilityIndex:
         """
         median absolute deviation
         """
-        return ss.median_abs_deviation(self.lc.mag, nan_policy='omit')
+        if self.lc.N < 3:
+            return None
+        else:
+            return ss.median_abs_deviation(self.lc.mag, nan_policy='omit')
 
     @property
     def chi_square(self):
         """
         Raw Chi-square value
         """
-        return np.sum((self.lc.mag - self.lc.weighted_average)**2 / self.lc.err**2)
+        if self.lc.N < 3:
+            return None
+        else:
+            return np.sum((self.lc.mag - self.lc.weighted_average)**2 / self.lc.err**2)
 
     @property
     def reduced_chi_square(self):
@@ -144,7 +121,10 @@ class VariabilityIndex:
         Reduced Chi-square value:
         raw chi-square divided by the number of degrees of freedom (N-1)
         """
-        return self.chisquare/(np.count_nonzero(
+        if self.lc.N < 3:
+            return None
+        else:
+            return self.chi_square/(np.count_nonzero(
                            ~np.isnan(self.lc.mag)) - 1)
     
     @property
@@ -152,7 +132,10 @@ class VariabilityIndex:
         """
         inter-quartile range
         """
-        return ss.iqr(self.lc.mag)
+        if self.lc.N < 3:
+            return None
+        else:
+            return ss.iqr(self.lc.mag)
     
     @property
     def roms(self):
@@ -174,7 +157,10 @@ class VariabilityIndex:
 
     @property
     def norm_ptp(self):
-        return (max(self.lc.mag - self.lc.err) - 
+        if self.lc.N < 3:
+            return None
+        else:
+            return (max(self.lc.mag - self.lc.err) - 
                 min(self.lc.mag + self.lc.err))/(max(self.lc.mag - self.lc.err) 
                                            + min(self.lc.mag + self.lc.err))    
 
@@ -240,53 +226,10 @@ class VariabilityIndex:
         """
         if (percentile <= 0.) or (percentile >= 49.):
             raise ValueError("Please enter a valid percentile (between 0. and 49.)")
-        return np.median(self.lc.mag[self.lc.mag <= np.percentile(self.lc.mag, percentile)]) - \
-               np.median(self.lc.mag[self.lc.mag >= np.percentile(self.lc.mag, 100 - percentile)])
+        p = percentile/100.
+        tail = round(p * self.lc.N)
+        return  np.median(np.sort(self.lc.mag)[-tail:]) - np.median(np.sort(self.lc.mag)[:tail])               
         
-    class periodicity_index:
-        def __init__(self, parent#, waveform_type, waveform_params
-                     ):
-            # waveform is a propertie of FoldedLightCurve and not periodicity_index. 
-            # I am thus refactoring this to avoid conflicting definitions
-            self.parent = parent
-            # self._waveform_type = waveform_type
-            # self._waveform_params = waveform_params
-            
-        # @property
-        # def waveform_type(self):
-            # """ 
-            # Waveform estimator method used to calculate the Q-index 
-            # """
-            # return self._waveform_type
-	
-        # @waveform_type.setter
-        # def waveform_type(self, new_waveform_type):
-        #     implemented_waveform_types = ['savgol', 'Cody',
-        #                              'circular_rolling_average_phase',
-        #                              'circular_rolling_average_number',
-        #                              'H22', 'uneven_savgol']
-        #     if new_waveform_type in implemented_waveform_types:
-        #         self._waveform_type = new_waveform_type
-        #     else:
-        #         raise ValueError("Please enter a valid waveform type {0}".format(implemented_waveform_types))
-            
-        # @property
-        # def waveform_params(self):
-        #     """ 
-        #     Parameters used to calculate the Q-index 
-        #     """
-        #     return self._waveform_params
-        
-        # @waveform_params.setter
-        # def waveform_params(self, new_waveform_params):
-        #     self._waveform_params = new_waveform_params
-           
-        @property
-        def value(self):
-            # print(self._waveform_type)
-            # self.parent.lc._get_waveform()
-            return (np.std(self.parent.lc.residual, ddof=1)**2 - np.mean(self.parent.lc.err_phased)**2)\
-                /(np.std(self.parent.lc.mag_phased, ddof=1)**2 - np.mean(self.parent.lc.err_phased)**2)
 
     def _list_properties(self):
         """
@@ -318,6 +261,48 @@ class VariabilityIndex:
         FoldedLightCurve.enable_warnings_globally()
         """
         cls._suppress_warnings = False       
+
+class AsymmetryIndex:
+    def __init__(self, parent, percentile=10., is_flux=False):
+        self.parent = parent
+        self._percentile = float(percentile)
+        self.is_flux = bool(is_flux)
+
+    @property
+    def percentile(self):
+        """ 
+        Percentile used to calculate the M-index 
+        """
+        return self._percentile
+
+    @percentile.setter
+    def percentile(self, new_percentile):
+        if (new_percentile > 0) and (new_percentile < 49.):
+            self._percentile = new_percentile
+        else:
+            raise ValueError("Please enter a valid percentile (between 0. and 49.)")
+
+    @property
+    def get_percentile_mask(self):
+        return (self.parent.lc.mag <= \
+                            np.percentile(self.parent.lc.mag, self._percentile))\
+                            | (self.parent.lc.mag >= \
+                                np.percentile(self.parent.lc.mag, 100 - self._percentile))
+                            
+    @property
+    def value(self):
+        return (1 - 2*int(self.is_flux))*(np.mean(self.parent.lc.mag[self.get_percentile_mask]) - self.parent.lc.median)/self.parent.lc.std
+
+class PeriodicityIndex:
+    def __init__(self, parent):
+        self.parent = parent
+
+    @property
+    def value(self):
+        # print(self._waveform_type)
+        # self.parent.lc._get_waveform()
+        return (np.std(self.parent.lc.residual, ddof=1)**2 - np.mean(self.parent.lc.err_phased)**2)\
+            /(np.std(self.parent.lc.mag_phased, ddof=1)**2 - np.mean(self.parent.lc.err_phased)**2)
 
 def gaia_AG_proxy(phot_g_mean_flux, phot_g_mean_flux_error, phot_g_n_obs):
     """
