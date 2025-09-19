@@ -160,8 +160,7 @@ class VariabilityIndex:
         """
         Robust-Median Statistics (RoMS)
         """
-        return np.median(np.abs(self.lc.mag\
-            - np.median(self.lc.mag)))
+        return np.sum(np.abs(self.lc.mag - np.median(self.lc.mag))/self.lc.err)/(self.lc.N - 1)
     
     @property
     def normalisedExcessVariance(self):
