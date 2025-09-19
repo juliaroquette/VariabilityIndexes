@@ -106,7 +106,10 @@ class LightCurve:
         Returns:
             float: light-curve time-span.
         """
-        return np.max(self.time) - np.min(self.time)
+        if self.N < 2:
+            return None
+        else:
+            return np.max(self.time) - np.min(self.time)
     
     @property
     def std(self):
@@ -149,7 +152,10 @@ class LightCurve:
         Returns:
             float: mags value.
         """
-        return self.mag.max()
+        if self.N < 2:
+            return None
+        else:
+            return self.mag.max()
     
     @property
     def min(self):
@@ -159,7 +165,10 @@ class LightCurve:
         Returns:
             float: max mags value.
         """
-        return self.mag.min()
+        if self.N < 2:
+            return None
+        else:
+            return self.mag.min()
     
     @property
     def time_max(self):
@@ -169,7 +178,10 @@ class LightCurve:
         Returns:
             float: max time value.
         """
-        return self.time.max()
+        if self.N < 2:
+            return None
+        else:
+            return self.time.max()
     
     @property
     def time_min(self):
@@ -179,7 +191,10 @@ class LightCurve:
         Returns:
             float: min time value.
         """
-        return self.time.min()
+        if self.N < 2:
+            return None
+        else:
+            return self.time.min()
 
     @property
     def weighted_average(self):
@@ -189,7 +204,9 @@ class LightCurve:
         Returns:
             float: Weighted average.
         """
-        return np.average(self.mag, weights=1./(self.err**2))
+        # this avoids division by zero:
+        weights = np.clip(1./(self.err**2), 1e-12, None)
+        return np.average(self.mag, weights=weights)
 
     @property
     def median(self):
@@ -205,15 +222,16 @@ class LightCurve:
     def ptp(self):
         """
         Returns the peak-to-peak amplitude of the magnitude values.
-        This is defined as the difference between the median values for the datapoints 
-        in the 5%outermost tails of the distribution.
+        This follows a simple definition of peak-to-peak amplitude as the difference between the maximum and minimum values.
 
         Returns:
             float: Peak-to-peak amplitude.
         """
-        tail = round(0.05 * self.N)
-        return  np.median(np.sort(self.mag)[-tail:]) - np.median(np.sort(self.mag)[:tail])
-        
+        if self.N < 2:
+            return None
+        else:
+            return np.max(self.mag) - np.min(self.mag)
+
     @property
     def range(self):
         """
@@ -222,7 +240,10 @@ class LightCurve:
         Returns:
             float: Range value.
         """
-        return self.mag.max() - self.mag.min()
+        if self.N < 2:
+            return None
+        else:
+            return self.mag.max() - self.mag.min()
     
     @property
     def SNR(self):
