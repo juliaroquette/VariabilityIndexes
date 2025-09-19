@@ -191,7 +191,21 @@ class VariabilityIndex:
     def kurtosis(self):
         return ss.kurtosis(self.lc.mag)
 
+    @property
+    def ptp_9_95(self):
+        """
+        Returns the peak-to-peak amplitude of the magnitude values.
+        This is defined as the difference between the median values for the datapoints 
+        in the 5% outermost tails of the distribution.
 
+        Returns:
+            float: Peak-to-peak amplitude.
+        """
+        tail = round(0.05 * self.N)
+        return  np.median(np.sort(self.mag)[-tail:]) - np.median(np.sort(self.mag)[:tail])
+        
+        
+        
     class Q_index:
         def __init__(self, parent#, waveform_type, waveform_params
                      ):

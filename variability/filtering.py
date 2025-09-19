@@ -257,7 +257,7 @@ class WaveForm:
         """
         x = np.concatenate((self.phase - 1., self.phase, 1. + self.phase))
         y = np.concatenate((self.mag_phased, self.mag_phased, self.mag_phased)) 
-        print(f"Debugging uneven_savgol with window={window}, polynom={polynom}")
+        # print(f"Debugging uneven_savgol with window={window}, polynom={polynom}")
         return  uneven_savgol(x, y, window, polynom)  [self.N:2*self.N]
     
     def get_waveform(self, waveform_type='uneven_savgol', waveform_params={}):
