@@ -5,17 +5,17 @@ a given light-curve.
 
 __This currently includes__
 - M_index (Cody et al. 2014)
-- Shapiro-Wilk
-- Chisquare
-- reducedChiSquare
-- IQR
-- RoMS
-- andersonDarling
+- shapiro_wilk
+- chi_square
+- reduced_chi_square
+- iqr
+- roms
+- anderson_darling
 - skewness
 - kurtosis
-- normalisedExcessVariance
-- Lag1AutoCorr
-- VonNeumann
+- normalised_excess_variance
+- lag1_auto_corr
+- von_neumann (abbe)
 - norm_ptp
 - mad
 - Q_index
@@ -29,7 +29,6 @@ __This currently includes__
 
 __ Under implementation __
 - stetsonK
-- Abbe
 
 __TO DO__
 - Add documenation to each method
@@ -122,7 +121,7 @@ class VariabilityIndex:
     #                   )/np.sqrt(self.lc.N*np.sum(residual**2))
 
     @property
-    def ShapiroWilk(self):
+    def shapiro_wilk(self):
         return ss.shapiro(self.lc.mag)[0]
 
     @property
@@ -133,14 +132,14 @@ class VariabilityIndex:
         return ss.median_abs_deviation(self.lc.mag, nan_policy='omit')
 
     @property
-    def chiSquare(self):
+    def chi_square(self):
         """
         Raw Chi-square value
         """
         return np.sum((self.lc.mag - self.lc.weighted_average)**2 / self.lc.err**2)
 
     @property
-    def reducedChiSquare(self):
+    def reduced_chi_square(self):
         """
         Reduced Chi-square value:
         raw chi-square divided by the number of degrees of freedom (N-1)
@@ -149,25 +148,25 @@ class VariabilityIndex:
                            ~np.isnan(self.lc.mag)) - 1)
     
     @property
-    def IQR(self):
+    def iqr(self):
         """
         inter-quartile range
         """
         return ss.iqr(self.lc.mag)
     
     @property
-    def RoMS(self):
+    def roms(self):
         """
         Robust-Median Statistics (RoMS)
         """
         return np.sum(np.abs(self.lc.mag - np.median(self.lc.mag))/self.lc.err)/(self.lc.N - 1)
     
     @property
-    def normalisedExcessVariance(self):
+    def normalised_excess_variance(self):
         return (self.lc.std**2 - self.lc.mean_err**2)/self.lc.mean**2
     
     @property
-    def Lag1AutoCorr(self):
+    def lag1_auto_corr(self):
         return np.sum((self.lc.mag[:-1] - self.lc.mean) *
                       (self.lc.mag[1:] - self.lc.mean))/np.sum(
                           (self.lc.mag - self.lc.mean)**2)
@@ -180,7 +179,7 @@ class VariabilityIndex:
                                            + min(self.lc.mag + self.lc.err))    
 
     @property
-    def andersonDarling(self):
+    def anderson_darling(self):
         return ss.anderson(self.lc.mag)[0]
 
     @property
@@ -192,7 +191,7 @@ class VariabilityIndex:
         return ss.kurtosis(self.lc.mag)
 
     @property
-    def ptp_9_95(self):
+    def ptp_5(self):
         """
         Returns the peak-to-peak amplitude of the magnitude values.
         This is defined as the difference between the median values for the datapoints 
@@ -201,10 +200,33 @@ class VariabilityIndex:
         Returns:
             float: Peak-to-peak amplitude.
         """
-        tail = round(0.05 * self.N)
-        return  np.median(np.sort(self.mag)[-tail:]) - np.median(np.sort(self.mag)[:tail])
+        return  self.ptp_perc(percentile=5.)
+    
+    @property
+    def ptp_10(self):
+        """
+        Returns the peak-to-peak amplitude of the magnitude values.
+        This is defined as the difference between the median values for the datapoints 
+        in the 10% outermost tails of the distribution.
+
+        Returns:
+            float: Peak-to-peak amplitude.
+        """
+        return  self.ptp_perc(percentile=10.)
+    
+    @property
+    def ptp_20(self):
+        """
+        Returns the peak-to-peak amplitude of the magnitude values.
+        This is defined as the difference between the median values for the datapoints 
+        in the 20% outermost tails of the distribution.
+
+        Returns:
+            float: Peak-to-peak amplitude.
+        """
+        return  self.ptp_perc(percentile=20.)
         
-        
+
         
     class Q_index:
         def __init__(self, parent#, waveform_type, waveform_params
@@ -301,5 +323,4 @@ def gaia_AG_proxy(phot_g_mean_flux, phot_g_mean_flux_error, phot_g_n_obs):
         phot_g_n_obs (_type_): _description_
     """
     return np.sqrt(phot_g_n_obs)*phot_g_mean_flux_error/phot_g_mean_flux
-    
     
