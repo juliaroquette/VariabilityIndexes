@@ -4,7 +4,7 @@ Class that calculates a series of variability indexes for
 a given light-curve.
 
 __This currently includes__
-- M_index (Cody et al. 2014)
+- asymmetry_index (Cody et al. 2014)
 - shapiro_wilk
 - chi_square
 - reduced_chi_square
@@ -18,7 +18,7 @@ __This currently includes__
 - von_neumann (abbe)
 - norm_ptp
 - mad
-- Q_index
+- periodicity_index
 
 -> Add:
 - gaia_AG_proxy
@@ -55,18 +55,18 @@ class VariabilityIndex:
         # calculate M-index
         M_percentile = kwargs.get('M_percentile', 10.)
         M_is_flux = kwargs.get('M_is_flux', False)
-        self.M_index = self.M_index(parent=self,percentile=M_percentile, is_flux=M_is_flux)
+        self.asymmetry_index = self.asymmetry_index(parent=self,percentile=M_percentile, is_flux=M_is_flux)
 
         # calculate Q-index
         if not isinstance(self.lc, FoldedLightCurve):
             warn("Q-index is only available for folded light-curves")
-            self.Q_index = None
+            self.periodicity_index = None
         else:
             # Q_waveform_type = kwargs.get('waveform_type', 'uneven_savgol')
             # Q_waveform_params = kwargs.get('waveform_params', {})
-            self.Q_index = self.Q_index(parent=self)#, waveform_type=Q_waveform_type, waveform_params=Q_waveform_params)
+            self.periodicity_index = self.periodicity_index(parent=self)#, waveform_type=Q_waveform_type, waveform_params=Q_waveform_params)
 
-    class M_index:
+    class asymmetry_index:
         def __init__(self, parent, percentile=10., is_flux=False):
             #default
             self._percentile = percentile
@@ -226,12 +226,27 @@ class VariabilityIndex:
         """
         return  self.ptp_perc(percentile=20.)
         
+    def ptp_perc(self, percentile=10.):
+        """
+        Returns the peak-to-peak amplitude of the magnitude values.
+        This is defined as the difference between the median values for the datapoints 
+        in the `percentile`% outermost tails of the distribution.
 
+        Args:
+            percentile (float, optional): Percentile to use for the tails. Defaults to 10..
+
+        Returns:
+            float: Peak-to-peak amplitude.
+        """
+        if (percentile <= 0.) or (percentile >= 49.):
+            raise ValueError("Please enter a valid percentile (between 0. and 49.)")
+        return np.median(self.lc.mag[self.lc.mag <= np.percentile(self.lc.mag, percentile)]) - \
+               np.median(self.lc.mag[self.lc.mag >= np.percentile(self.lc.mag, 100 - percentile)])
         
-    class Q_index:
+    class periodicity_index:
         def __init__(self, parent#, waveform_type, waveform_params
                      ):
-            # waveform is a propertie of FoldedLightCurve and not Q_index. 
+            # waveform is a propertie of FoldedLightCurve and not periodicity_index. 
             # I am thus refactoring this to avoid conflicting definitions
             self.parent = parent
             # self._waveform_type = waveform_type
@@ -323,4 +338,3 @@ def gaia_AG_proxy(phot_g_mean_flux, phot_g_mean_flux_error, phot_g_n_obs):
         phot_g_n_obs (_type_): _description_
     """
     return np.sqrt(phot_g_n_obs)*phot_g_mean_flux_error/phot_g_mean_flux
-    
