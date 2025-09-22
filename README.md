@@ -43,7 +43,7 @@ amplitude = 0.5
 noise =  np.random.normal(scale=0.05, size=N)
 mag_sin = 0.5 * amplitude * np.sin(2 * np.pi * time / period) + noise
 ````
-
+**Note:** it is important to note that astronomical magnitudes are obtained from the observed flux of stars. For the fluxes, it is common to assume that errors are Gaussian distributed, which is ok for bright sources (but not always true!). However, when converting fluxes to magnitudes, $x_i=-2.5\log\big(\frac{f_i}{f_0}\big)$, uncertainty propagation yield asymmetric uncertainties. It is a common assumption that error are symmetric even in magnitude, with the argument that that for small errors in flux, a log function will be approximately linear. This note must be kept in mind for both when simulating light curves, but also when working with variability indexes that assume a specific behavior for the case of constant stars dominated by gaussian noise. 
 
 ## `LightCurve` class
 
@@ -51,13 +51,17 @@ To instantiate a `LightCurve` object:
 
 ```python
   from variability.lightcurve import LightCurve
-  lc = LightCurve(time, mag, err, mask=None, is_flux=False)
+  lc = LightCurve(time, mag, err, mask=None, is_flux=False, min_epochs=5)
 ```
 
-Where the attributes `time`, `mag`, and `err` are numpy-arrays with the same length providing the observational time, magnitudes and magnitude uncertainties respectively. Optionally a `mask` boolean array can be passed to filter out missing data or spurious observations. The `is_flux` attribute informs if the light-curve is in terms of magnitudes or fluxes (this is important when calculating M-indexes.)
+Where the attributes `time`, `mag`, and `err` are numpy-arrays with the same length providing the observational time, magnitudes and magnitude uncertainties respectively. Optionally a `mask` boolean array can be passed to filter out missing data or spurious observations. The `is_flux` attribute informs if the light-curve is in terms of magnitudes or fluxes (this is important when calculating M-indexes.). `min_epochs=5` is the minimum number of epochs in the light curve for properties derived from statistics with the light curve to be calculated. 
 
-`LightCurve` objects have a series of properties:
-- `N` : Number of datapoints in the light curve.
+`LightCurve` objects have a series of properties. To see the list of properties currently implemented, use:
+
+``lc._list_properties()``
+
+
+- `n_epochs` : Number of datapoints (number of epochs), $N$, in the light curve.
 - `std`: Standard deviation of the magnitudes [(uses bias corrected `numpy.std`)](https://numpy.org/doc/stable/reference/generated/numpy.std.html).
 $$
 \sigma = \sqrt{\frac{1}{N-1} \sum_{i=1}^{N} (x_i - \bar{x})^2}
@@ -69,7 +73,7 @@ $$\bar{x} = \frac{1}{N} \sum_{i=1}^{N} x_i$$
 
 - `mean_err`:  average uncertainty in magnitudes (or typical uncertainty)
 
-$$\bar{\epsilon} = \frac{1}{N} \sum_{i=1}^{N} \epsilon$$
+$$\bar{\epsilon} = \frac{1}{N} \sum_{i=1}^{N} \epsilon_i$$
 
 
 - `weighted_average`: Weighted average of the magnitude values.
@@ -88,19 +92,22 @@ x_{\left(\frac{n+1}{2}\right)} & \text{if } n \text{ is odd} \\
 Uses [`np.median`](https://numpy.org/doc/stable/reference/generated/numpy.nanmedian.html#numpy.nanmedian)
 - `min`: Minimum value of the magnitudes.
 - `max`: Maximum value of the magnitudes.
-- `ptp`: Peak-to-peak amplitude of the magnitude values. Defined as the difference between the median values for the datapoints in the 5% outermost tails of the distribution.
+- `ptp`: Peak-to-peak amplitude of the magnitude values. Simply define as the difference between the max and min (range) of magnitudes, $x_{max}-x_{min}$ . (for more robust definitions see the `VariabilityIndex` class below)
 - `time_max`: Maximum value of the observation times ($t_{max}$).
 - `time_min`: Minimum value of the observation times ($t_{min}$).
-- `time_span`: Total time-span of the light curve
+<!--- `time_span`: Total time-span of the light curve
  
 $$t_{max}-t_{min}$$ 
-
+-->
 - `range`: another flavor of ptp amplitude bin in terms of maximum/minimum values of magnitude: $$x_{max}-x_{min}$$ 
 - `SNR` signal-to-noise ratio (standard deviation of the data divided by average uncertainty)
 
 $$\text{SNR}=\frac{\sigma}{\bar{\epsilon}}$$
 
 
+TODO:
+
+- add further time info which can help the GLS definition. typical delta t, minimum/maximum delta t
 
 ## `FoldedLightCurve` class
 
@@ -177,7 +184,7 @@ from variability.lightcurve import FoldedLightCurve
 
 # Variability Indexes
 
-Include a suite of widely used variability indexes. 
+Include a suite of widely used variability indexes. A great review on this subject is providedby  [Sokolovsky et al. (2017)](https://academic.oup.com/mnras/article-lookup/doi/10.1093/mnras/stw2262) with several of the indexes implemented here discussed there with appropriate references. 
 
 ## `indexes`
 
@@ -193,11 +200,13 @@ var = VariabilityIndex(lc_p, timescale=period)
 
 you are expected to pass in a `LightCurve` object, or a `FoldedLightCurve` object. However,  **note that some variability indexes, like the Q-index itself, require either a `timescale` argument or a `FoldedLightCurve` instance (which already have an instance `timescale`).
 
+The list of implemented variability indexes currently implemented can be accessed with:
 
+``VariabilityIndex._list_properties()``
 
 ### 'Usual' Variability indexes:
 
-#### Shapriro-Wilk test
+#### Shapriro-Wilk test (`VariabilityIndex.shapiro_wilk`)
 
 $$W = \frac{\left(\sum_{i=1}^{n} a_i x_{(i)}\right)^2}{\sum_{i=1}^{n} (x_i - \bar{x})^2}$$
 
@@ -212,7 +221,7 @@ Expected behavior:
 
 **Note:** It is good as a complementary index for capture asymmetric variability behaviour. 
 
-#### median absolute deviation (MAD)
+#### median absolute deviation (MAD): (`VariabilityIndex.mad`)
 
   $$\text{MAD} = \text{median} \left( \left| x_i - \text{median}(x) \right| \right)$$
 
@@ -223,25 +232,30 @@ Expected behavior:
 - For symmetric variability: $MAD>\bar{\epsilon}$.
 - For asymmetric variability: $\sigma>MAD\gtrsim\bar{\epsilon}$, this is because unlike the standard deviation, $\sigma$, MAD is insensitive to outliers. 
 
-**Note:** It is good for capturing symmetric behaviour. 
+**Note:** Insensitive to outliers (but also to real asymmetric variability) It is good for capturing symmetric behaviour. 
 
-#### $\chi^2$
+**Reference:** [Sokolovsky et al. (2017), Sec. 2.3](https://academic.oup.com/mnras/article-lookup/doi/10.1093/mnras/stw2262)
+
+#### $\chi^2$ (`VariabilityIndex.chi_square`)
 $$\chi^2 = \sum_{i=1}^{k} \frac{(O_i - E_i)^2}{E_i}$$
 
 with $\chi^2$ as the chi-squared statistic, $O_i$ is the observed frequency for each category or bin, $E_i$ is the expected frequency for each category or bin, and $k$ are the total number of categories or bins. This is a statistical tests to evaluate if the source is compatible with being constant. This is calculated following the equation:
 
-$$\chi^2 = \sum_{i=1}^{N} \frac{\left( x_i - \bar{x}_w \right)^2}{\sigma_i^2}, \quad
-\bar{x}_w = \frac{\sum_{i=1}^{N} \frac{x_i}{\sigma_i^2}}{\sum_{i=1}^{N} \frac{1}{\sigma_i^2}}$$
+$$\chi^2 = \sum_{i=1}^{N} \frac{\left( x_i - \bar{x}_w \right)^2}{\epsilon_i^2}, \quad
+\bar{x}_w = \frac{\sum_{i=1}^{N} \frac{x_i}{\epsilon_i^2}}{\sum_{i=1}^{N} \frac{1}{\epsilon_i^2}}$$
 
+ $\chi^2$ is a statistical test, where in the current context the null-hyposis is that the source is not variable (light curve is dominated by noise, assumed to be gaussian).
 
 Expected behavior depends on the number of epochs (see reduced-$\chi^2$):
 - For Gaussian noise: $\chi^2\approx N -1$
 - For symmetric variability: $\chi^2> N -1$
 - For asymmetric variability:$\chi^2\gg N -1$
 
-**Note:** for non-normalised $\chi^2$, the values will depend on the number of epochs (degrees of freedon). $\chi^2$ grows with variability amplitude, but the $\left( x_i - \bar{x}_w \right)^2$ term implies that it rewards large outliers/asymmetries. 
+**Note:** for non-normalised $\chi^2$, the values will depend on the number of epochs (degrees of freedon). $\chi^2$ grows with variability amplitude, but the $\left( x_i - \bar{x}_w \right)^2$ term implies that it rewards large outliers/asymmetries. Note that the assumption of gaussian noise here implies that this should better be estimated in flux, which my package is not doing at the moment, thus $\chi^2$ must be interpreted with a piece of salt. 
 
-#### reduced-$\chi^2$
+**Reference:** [Sokolovsky et al. (2017), Sec. 2.1](https://academic.oup.com/mnras/article-lookup/doi/10.1093/mnras/stw2262)
+
+#### reduced-$\chi^2$ (`VariabilityIndex.reduced_chi_square`)
 
 $\chi_\nu^2 = \frac{\chi^2}{\nu}$, where $\nu$ are the degrees of freedom, which in this case relates to the number of epochs, $\nu=N-1$
 
@@ -250,34 +264,38 @@ Expected behavior:
 - For symmetric variability: $\chi^2> N -1$
 - For asymmetric variability: $\chi^2\gg N -1$
 
+**Reference:** [Sokolovsky et al. (2017), Sec. 2.1](https://academic.oup.com/mnras/article-lookup/doi/10.1093/mnras/stw2262)
 
-#### Inter-quantitle  range (IRQ)
+#### Inter-quantitle  range (IRQ) (`VariabilityIndex.iqr`)
 
 $$\text{IQR} = Q_3 - Q_1$$
-Where $Q_1$ and $Q_3$ are the first and third quartile. Estimated from [`scipy.stats.iqr`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.iqr.html#scipy.stats.iqr). It is related to the $\sigma$ and to the $\text{MAD}$, where $IQR\approx0.761
+Where $Q_1$ and $Q_3$ are the first and third quartile. Estimated from [`scipy.stats.iqr`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.iqr.html#scipy.stats.iqr). It is related to the $\sigma$ and to the $\text{MAD}$, where $\text{IQR}\approx0.761\text{MAD}$
 
 
 Expected behavior:
-- For Gaussian noise: $0.741\times\text{IQR}\approx\bar{\epsilon}$, i.e., this reflects the noise level. 
+- For Gaussian noise: $\text{IQR}\approx1.349\times\bar{\epsilon}$, i.e., this reflects the noise level. 
 - For symmetric variability: $IQR>\bar{\epsilon}$.
 - For asymmetric variability: $IQR\gtrsim\bar{\epsilon}$.
 
-**Note:** Similar to the MAD, it captures variability without being sensitive to outliers.
+**Note:** Similar to the MAD, it captures variability without being sensitive to outliers, it may work better for asymmetric variability.
 
-#### Robust-Median Statistics (RoMS)
+**Reference:** [Sokolovsky et al. (2017), Sec. 2.4](https://academic.oup.com/mnras/article-lookup/doi/10.1093/mnras/stw2262)
 
-$$\text{Robust-Median} = \text{median}(|x_i - \text{median}(x)|)$$
+#### Robust-Median Statistics (RoMS) (`VariabilityIndex.roms`)
 
-Measures typical deviation from the median. With the deviations measured as absolute values, rather than square of the differences (like in the $\chi^2$), this is also robust against outliers. 
+$$\text{RoMS} = \frac{1}{N-1}\sum_{i=1}^{N} \frac{\big| x_i - \mathrm{median}(x)\big|}{\epsilon_i},$$
+
+This is similar to the MAD, but it takes into consideration the typical uncertainty in the light curve. 
 
 Expected behavior:
-- For Gaussian noise: $0.674\times\text{RoMS}\approx\bar{\epsilon}$, i.e., this reflects the noise level. 
-- For symmetric variability: $RoMS>\bar{\epsilon}$.
-- For asymmetric variability: $RoMS\gtrsim\bar{\epsilon}$.
+- For Gaussian noise: $RoMS\approx1$
+- For real variables: $RoMS>1$
 
-**Note:** Similar to MAD and IQR is less sensitive to extreme asymmetric variability.
+**Note:** It is not robust against outliers, as if the outlier has its uncertainty underestimated, it gives a large contribution to the RoMS. 
 
-#### normalisedExcessVariance
+**Reference:** [Sokolovsky et al. (2017), Sec. 2.5](https://academic.oup.com/mnras/article-lookup/doi/10.1093/mnras/stw2262)
+
+#### normalised Excess Variance (`VariabilityIndex.normalised_excess_variance`)
 
 
 $$\sigma_{\text{NXS}}^2 = \frac{\sigma^2 - \langle \bar{\epsilon}^2 \rangle}{\langle x \rangle^2}$$
@@ -291,12 +309,14 @@ Expected behavior:
 
 **Note:** If uncertainties are too large (or over estimated), than $\sigma_{\text{NXS}}^2<0$ is possible. 
 
-#### Lag1AutoCorr ($l_1$)
+**Reference:** [Sokolovsky et al. (2017), Sec. 2.6](https://academic.oup.com/mnras/article-lookup/doi/10.1093/mnras/stw2262)
+
+#### Lag1AutoCorr ($l_1$) (`VariabilityIndex.lag1_auto_corr`)
 
 
 $$l_1 = \frac{\sum_{i=1}^{N-1} (x_i - \bar{x})(x_{i+1} - \bar{x})}{\sum_{i=1}^{N} (x_i - \bar{x})^2}$$
 
-Measures how much a light curve is correlated with itself at one-time-step lag. 
+First order autocorrelation coefficient. Measures how much a light curve is correlated with itself at one-time-step lag. 
 
 
 Expected behavior:
@@ -308,7 +328,7 @@ Expected behavior:
 **Note:** This will depend on how the cadence of observations is.
 
 
-####  andersonDarling
+#### Anderson-Darling (`VariabilityIndex.anderson_darling`)
 
 
 $$A^2 = -N - \frac{1}{N} \sum_{i=1}^{N} \left[
@@ -327,7 +347,7 @@ Expected behavior:
 **Note**: If the approximation of Gaussian noise fails for the dataset, then even constant stars will show $A^2>0$. It is very sensitive to outliers. 
 
 
-#### skewness
+#### Skewness (`VariabilityIndex.skewness`)
 $$\text{Skewness} = \frac{\frac{1}{n} \sum_{i=1}^{n} (x_i - \bar{x})^3}{\left(\frac{1}{n} \sum_{i=1}^{n} (x_i - \bar{x})^2\right)^{\frac{3}{2}}}$$
 
 Expected behavior:
@@ -338,7 +358,7 @@ Expected behavior:
 **Note**
 
 
-####  kurtosis
+####  kurtosis (`VariabilityIndex.kurtosis`)
 $$\text{Kurtosis} = \frac{\frac{1}{n} \sum_{i=1}^{n} (x_i - \bar{x})^4}{\left(\frac{1}{n} \sum_{i=1}^{n} (x_i - \bar{x})^2\right)^2}$$
 
 
@@ -357,47 +377,67 @@ Expected behavior:
 ~~Calculate Abbe value as in Mowlavi 2014A%26A...568A..78M
 https://www.aanda.org/articles/aa/full_html/2014/08/aa22648-13/aa22648-13.html~~
 
+**Reference:** [Sokolovsky et al. (2017), also Sec. 2.16](https://academic.oup.com/mnras/article-lookup/doi/10.1093/mnras/stw2262)
 
-#### Normalized peak-to-peak variability
+Also nami
 
-`norm_ptp`
+#### Normalized peak-to-peak variability `VariabilityIndex.norm_ptp`
 
-Sokolovsky et al. (2017):
-$$\nu = \frac{(m_i-\sigma_i)_\mathrm{max} - (m_i-\sigma_i)_\mathrm{min}}{(m_i+\sigma_i)_\mathrm{max} + (m_i+\sigma_i)_\mathrm{min}}$$
+$$\nu = \frac{(x_i-\epsilon_i)_\mathrm{max} - (x_i-\epsilon_i)_\mathrm{min}}{(x_i+\epsilon_i)_\mathrm{max} + (x_i+\epsilon_i)_\mathrm{min}}$$
 
-where $m_i$ is the magnitude measurement and $\sigma_i$ is the corresponding measurement error. 
+where $x_i$ is the magnitude measurement and $\epsilon_i$ is the corresponding measurement error. 
 
 
-Expected behavior:
-- For Gaussian noise: 
-- For symmetric variability: 
-- For asymmetric variability:
+Expected behavior: measure of variability amplitude
 
-**Note**
+**Reference:** [Sokolovsky et al. (2017), Sec. 2.7](https://academic.oup.com/mnras/article-lookup/doi/10.1093/mnras/stw2262)
 
-### `VariabilityIndex.M_index`
 
-$$M = \frac{<m_{10\%}>-m_{med}}{\sigma_m}$$
 
-$<m_{10\%}>$ is all the data in the top and bottom decile of the light-curve. 
+#### Tail peak to peak
+
+Robust peak-to-peak amplitude estimator defined as the difference between the median values of the tails of the magnitude distribution. Tails are defined as the $p\%$ outermost sources at each side of the distribution.
+
+$$\Delta x_{p}=\text{median}\{x_i:x_i\leq P_{100-p}\}-\text{median}\{x_i:x_i\leq P_{p}\},$$
+
+Where $P_p$ is the p-th percentile of the distribution of magnitudes. 
+
+Here there are 3 flavours implemented:
+
+- `VariabilityIndex.ptp_5`: ptp based on the 5th and 95th tails
+- `VariabilityIndex.ptp_10`: ptp based on the 10th and 90th tails
+- `VariabilityIndex.ptp_20`: ptp based on the 20th and 80th tails
+
+Expected behavior: measure of variability amplitude while robust against outliers. The smaller the percentile, the more sensitive it will be against extreme asymmetric variability. The higher p may work better for describing the typical variability amplitude. 
+
+#### weighted standard deviation
+
+**Reference:** [Sokolovsky et al. (2017), Sec. 2.2](https://academic.oup.com/mnras/article-lookup/doi/10.1093/mnras/stw2262)
+
+#### M-index (`VariabilityIndex.asymmetry_index`)
+
+$$M = \frac{<x_{10\%}>-\text{median\{x\}}}{\sigma_m}$$
+
+$<x_{10\%}>$ is all the data in the top and bottom decile of the light-curve. 
 Not that there are conflicting definitions in the literature, where $\sigma_m$ is sometimes the overall rms of the light-curve and sometimes its standard-deviation! Here I am using the second one. 
 
 
 Expected behavior:
-- For Gaussian noise: 
-- For symmetric variability: 
-- For asymmetric variability:
+- For symmetric variability: $M\sim0$
+- For dimming variability: $M\gg0$
+- For brightening variability: $M\ll0$
 
-**Note**
 
-### `VariabilityIndex.Q_index`
+**Reference:** [Cody+2014](https://iopscience.iop.org/article/10.1088/0004-6256/147/4/82)
 
-$$Q = \frac{\sigma_\mathrm{res}^2-\sigma_\mathrm{phot}^2}{\sigma^2_\mathrm{raw}-\sigma^2_\mathrm{phot}}$$ 
+#### Q-index `VariabilityIndex.periodicity_index`
+
+$$Q = \frac{\sigma_\mathrm{res}^2-\bar{\epsilon}^2}{\sigma^2-\bar{\epsilon}^2}$$ 
 
 where:
 - $\sigma_\mathrm{res}^2$ and $\sigma^2_\mathrm{raw}$ are the ~rms~ variance values of the raw light curve and the phase-subtracted light curve.
-- $\sigma_\mathrm{raw}^2$ is the variance of the original light-curve
-- $\sigma_\mathrm{phot}$ is the mean photometric error
+- $\sigma^2$ is the variance of the original light-curve
+- $\bar{\epsilon}$ is the mean photometric error
 
 
 1. Find a period (Lomb Scargle Periodogram for ex)
@@ -408,11 +448,13 @@ where:
 
 
 Expected behavior:
-- For Gaussian noise: 
-- For symmetric variability: 
-- For asymmetric variability:
+- For strictly periodic sources $Q\sim0$
+- For aperiodic sources $Q\sim1$
+
+**Reference:** [Cody+2014](https://iopscience.iop.org/article/10.1088/0004-6256/147/4/82)
 
 **Note**
+
 
 ## TO DO list
 
@@ -422,7 +464,10 @@ Expected behavior:
   - :white_large_square: Complete description
   - :white_large_square: add examples
   - :white_large_square: add references
+- interpercentile range
+-  
 </details>
+
 
 # Filtering
 
