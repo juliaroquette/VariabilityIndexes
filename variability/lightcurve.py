@@ -14,10 +14,10 @@ Carried out some debugging
 Last version
 
 TO DO:
-- Add reference time to fase folding
-- review waveform derivation
-Define a multi-wavelength light curve class
-Define a class/function that generates a sample of light-curves
+- ptp and ramge are now repeated properties, should be fixed
+- Add metod for getting light curve time properties 
+- Define a multi-wavelength light curve class
+- Define a class/function that generates a sample of light-curves
 """
 
 import numpy as np
@@ -61,7 +61,8 @@ class LightCurve:
                  mag,
                  err,
                  mask=None,
-                 is_flux=False):
+                 is_flux=False, 
+                 min_epochs=5):
         """
         Initializes a LightCurve object.
 
@@ -87,9 +88,10 @@ class LightCurve:
         self.err = self.err[sorted_indices]        
         # keyword specifying if we are working in flux (relevant for M-index calculation)
         self.is_flux = is_flux
+        self.min_epochs = min_epochs
 
     @property    
-    def N(self):
+    def n_epochs(self):
         """
         Returns the number of datapoints in the light curve.
 
@@ -106,7 +108,7 @@ class LightCurve:
         Returns:
             float: light-curve time-span.
         """
-        if self.N < 2:
+        if self.n_epochs < 3:
             return None
         else:
             return np.max(self.time) - np.min(self.time)
@@ -119,10 +121,13 @@ class LightCurve:
         Returns:
             float: Standard deviation.
         """
-        return np.std(self.mag,
-                      # ddof=1 makes sure std is bias-corrects 
-                      # this means N-1 is used as the denominator rather than N 
-                      ddof=1) 
+        if self.n_epochs < self.min_epochs:
+            return None
+        else:
+            return np.std(self.mag,
+                        # ddof=1 makes sure std is bias-corrects 
+                          # this means N-1 is used as the denominator rather than N 
+                        ddof=1) 
 
     @property
     def mean(self):
@@ -152,7 +157,7 @@ class LightCurve:
         Returns:
             float: mags value.
         """
-        if self.N < 2:
+        if self.n_epochs < self.min_epochs:
             return None
         else:
             return self.mag.max()
@@ -165,7 +170,7 @@ class LightCurve:
         Returns:
             float: max mags value.
         """
-        if self.N < 2:
+        if self.n_epochs < self.min_epochs:
             return None
         else:
             return self.mag.min()
@@ -178,7 +183,7 @@ class LightCurve:
         Returns:
             float: max time value.
         """
-        if self.N < 2:
+        if self.n_epochs < self.min_epochs:
             return None
         else:
             return self.time.max()
@@ -191,7 +196,7 @@ class LightCurve:
         Returns:
             float: min time value.
         """
-        if self.N < 2:
+        if self.n_epochs < self.min_epochs:
             return None
         else:
             return self.time.min()
@@ -221,29 +226,29 @@ class LightCurve:
     @property
     def ptp(self):
         """
-        Returns the peak-to-peak amplitude of the magnitude values.
+        Returns the (range) peak-to-peak amplitude of the magnitude values.
         This follows a simple definition of peak-to-peak amplitude as the difference between the maximum and minimum values.
 
         Returns:
             float: Peak-to-peak amplitude.
         """
-        if self.N < 2:
+        if self.n_epochs < 3:
             return None
         else:
             return np.max(self.mag) - np.min(self.mag)
 
-    @property
-    def range(self):
-        """
-        Returns the range of the magnitude values.
+    # @property
+    # def range(self):
+    #     """
+    #     Returns the range of the magnitude values.
 
-        Returns:
-            float: Range value.
-        """
-        if self.N < 2:
-            return None
-        else:
-            return self.mag.max() - self.mag.min()
+    #     Returns:
+    #         float: Range value.
+    #     """
+    #     if self.n_epochs < 3:
+    #         return None
+    #     else:
+    #         return self.mag.max() - self.mag.min()
     
     @property
     def SNR(self):
@@ -255,7 +260,10 @@ class LightCurve:
         Returns:
             float: Signal-to-noise ratio.
         """
-        return self.std/self.mean_err
+        if self.n_epochs < self.min_epochs:
+            return None
+        else:
+            return self.std/self.mean_err
     
     def _list_properties(self):
         """
@@ -297,7 +305,7 @@ class FoldedLightCurve(LightCurve):
                 
         # phasefold lightcurves have a waveform
         self._waveform_type = kwargs.get('waveform_type', 'uneven_savgol')
-        self._waveform_params = kwargs.get('waveform_params', {'window': round(.25*self.N), 'polynom': 1})
+        self._waveform_params = kwargs.get('waveform_params', {'window': round(.25*self.n_epochs), 'polynom': 1})
         self._get_waveform()
 
 
@@ -417,7 +425,7 @@ class FoldedLightCurve(LightCurve):
     def __repr__(self):
         return (f"<FoldedLightCurve(timescale={self._timescale}, "
             f"waveform_type={self._waveform_type}, "
-            f"N={self.N})>")
+            f"N={self.n_epochs})>")
     
 class SyntheticLightCurve:
     """
