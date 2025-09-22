@@ -86,10 +86,10 @@ class VariabilityIndex:
         """
         print('odl implementation has a bug')
         return None    
-    #     residual = np.sqrt(self.lc.N)/(self.lc.n_epochs- 1.)*\
+    #     residual = np.sqrt(self.lc.n_epochs)/(self.lc.n_epochs- 1.)*\
     #         (self.mag - self.lc.weighted_average)/self.err
     #     return np.sum(np.fabs(residual)
-    #                   )/np.sqrt(self.lc.N*np.sum(residual**2))
+    #                   )/np.sqrt(self.lc.n_epochs*np.sum(residual**2))
 
     @property
     def shapiro_wilk(self):
@@ -227,7 +227,7 @@ class VariabilityIndex:
         if (percentile <= 0.) or (percentile >= 49.):
             raise ValueError("Please enter a valid percentile (between 0. and 49.)")
         p = percentile/100.
-        tail = round(p * self.lc.N)
+        tail = round(p * self.lc.n_epochs)
         return  np.median(np.sort(self.lc.mag)[-tail:]) - np.median(np.sort(self.lc.mag)[:tail])               
         
 
