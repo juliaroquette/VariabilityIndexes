@@ -51,23 +51,27 @@ class VariabilityIndex:
     def __init__(self, lc, **kwargs):
         if not isinstance(lc, LightCurve):
             raise TypeError("lc must be an instance of LightCurve")
-        self.lc = lc        
+        self.lc = lc
+        self._params = kwargs.copy()
 
 
     @property
-    def periodicity_index(self, **kwargs):
-        if not isinstance(self.lc, FoldedLightCurve):
+    def periodicity_index(self):
+        if (self.lc.n_epochs > self.lc.min_epochs) and isinstance(self.lc, FoldedLightCurve):
+            return PeriodicityIndex(parent=self)
+        else:
             # warn("Q-index is only available for folded light-curves")
             return None
-        else:
-            return PeriodicityIndex(parent=self)
-    
+
     @property
-    def asymmetry_index(self, **kwargs):
+    def asymmetry_index(self):
         # calculate M-index
-        M_percentile = kwargs.get('M_percentile', 10.)
-        M_is_flux = kwargs.get('M_is_flux', False)
-        return AsymmetryIndex(parent=self,percentile=M_percentile, is_flux=M_is_flux).value
+        M_percentile = self._params.get('M_percentile', 10.)
+        M_is_flux = self._params.get('M_is_flux', False)
+        if self.lc.n_epochs > self.lc.min_epochs:
+            return AsymmetryIndex(parent=self,percentile=M_percentile, is_flux=M_is_flux).value
+        else:
+            return None
 
     # @property    
     def Abbe(self):
@@ -75,8 +79,11 @@ class VariabilityIndex:
         Calculate Abbe value as in Mowlavi 2014A%26A...568A..78M
         https://www.aanda.org/articles/aa/full_html/2014/08/aa22648-13/aa22648-13.html
         """
-        return self.lc.n_epochs* np.sum((self.lc.mag[1:] - self.lc.mag[:-1])**2) /\
-            2 / np.sum((self.lc.mag - self.lc.mean)**2) / (self.lc.n_epochs- 1)
+        if self.lc.n_epochs > self.lc.min_epochs:
+            return self.lc.n_epochs* np.sum((self.lc.mag[1:] - self.lc.mag[:-1])**2) /\
+                2 / np.sum((self.lc.mag - self.lc.mean)**2) / (self.lc.n_epochs- 1)
+        else:
+            return None
 
     # this is bugged     
     # @property   
@@ -93,7 +100,10 @@ class VariabilityIndex:
 
     @property
     def shapiro_wilk(self):
-        return ss.shapiro(self.lc.mag)[0]
+        if self.lc.n_epochs > self.lc.min_epochs:
+            return ss.shapiro(self.lc.mag)[0]
+        else:
+            return None
 
     @property
     def mad(self):
@@ -142,15 +152,24 @@ class VariabilityIndex:
         """
         Robust-Median Statistics (RoMS)
         """
-        return np.sum(np.abs(self.lc.mag - np.median(self.lc.mag))/self.lc.err)/(self.lc.n_epochs- 1)
-    
+        if self.lc.n_epochs > self.lc.min_epochs:
+            return np.sum(np.abs(self.lc.mag - np.median(self.lc.mag))/self.lc.err)/(self.lc.n_epochs- 1)
+        else:
+            return None
+
     @property
     def normalised_excess_variance(self):
-        return (self.lc.std**2 - self.lc.mean_err**2)/self.lc.mean**2
-    
+        if self.lc.n_epochs > self.lc.min_epochs:
+            return (self.lc.std**2 - self.lc.mean_err**2)/self.lc.mean**2
+        else:
+            return None
+
     @property
     def lag1_auto_corr(self):
-        return np.sum((self.lc.mag[:-1] - self.lc.mean) *
+        if self.lc.n_epochs < self.lc.min_epochs:
+            return None
+        else:
+            return np.sum((self.lc.mag[:-1] - self.lc.mean) *
                       (self.lc.mag[1:] - self.lc.mean))/np.sum(
                           (self.lc.mag - self.lc.mean)**2)
     
@@ -166,15 +185,24 @@ class VariabilityIndex:
 
     @property
     def anderson_darling(self):
-        return ss.anderson(self.lc.mag)[0]
+        if self.lc.n_epochs < self.lc.min_epochs:
+            return None
+        else:
+            return ss.anderson(self.lc.mag)[0]
 
     @property
     def skewness(self):
-        return ss.skew(self.lc.mag, nan_policy='omit')
+        if self.lc.n_epochs < self.lc.min_epochs:
+            return None
+        else:
+            return ss.skew(self.lc.mag, nan_policy='omit')
 
     @property
     def kurtosis(self):
-        return ss.kurtosis(self.lc.mag)
+        if self.lc.n_epochs < self.lc.min_epochs:
+            return None
+        else:
+            return ss.kurtosis(self.lc.mag)
 
     @property
     def ptp_5(self):
@@ -186,8 +214,11 @@ class VariabilityIndex:
         Returns:
             float: Peak-to-peak amplitude.
         """
-        return  self.ptp_perc(percentile=5.)
-    
+        if self.lc.n_epochs < self.lc.min_epochs:
+            return None
+        else:
+            return  self.ptp_perc(percentile=5.)
+
     @property
     def ptp_10(self):
         """
@@ -198,8 +229,11 @@ class VariabilityIndex:
         Returns:
             float: Peak-to-peak amplitude.
         """
-        return  self.ptp_perc(percentile=10.)
-    
+        if self.lc.n_epochs < self.lc.min_epochs:
+            return None
+        else:
+            return  self.ptp_perc(percentile=10.)
+
     @property
     def ptp_20(self):
         """
@@ -210,8 +244,11 @@ class VariabilityIndex:
         Returns:
             float: Peak-to-peak amplitude.
         """
-        return  self.ptp_perc(percentile=20.)
-        
+        if self.lc.n_epochs < self.lc.min_epochs:
+            return None
+        else:
+            return  self.ptp_perc(percentile=20.)
+
     def ptp_perc(self, percentile=10.):
         """
         Returns the peak-to-peak amplitude of the magnitude values.
@@ -291,7 +328,7 @@ class AsymmetryIndex:
                             
     @property
     def value(self):
-        return (1 - 2*int(self.is_flux))*(np.mean(self.parent.lc.mag[self.get_percentile_mask]) - self.parent.lc.median)/self.parent.lc.std
+        return (1. - 2*int(self.is_flux))*(np.mean(self.parent.lc.mag[self.get_percentile_mask]) - self.parent.lc.median)/self.parent.lc.std
 
 class PeriodicityIndex:
     def __init__(self, parent):
