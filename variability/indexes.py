@@ -75,8 +75,8 @@ class VariabilityIndex:
         Calculate Abbe value as in Mowlavi 2014A%26A...568A..78M
         https://www.aanda.org/articles/aa/full_html/2014/08/aa22648-13/aa22648-13.html
         """
-        return self.lc.N * np.sum((self.lc.mag[1:] - self.lc.mag[:-1])**2) /\
-            2 / np.sum((self.lc.mag - self.lc.mean)**2) / (self.lc.N - 1)
+        return self.lc.n_epochs* np.sum((self.lc.mag[1:] - self.lc.mag[:-1])**2) /\
+            2 / np.sum((self.lc.mag - self.lc.mean)**2) / (self.lc.n_epochs- 1)
 
     # this is bugged     
     # @property   
@@ -86,7 +86,7 @@ class VariabilityIndex:
         """
         print('odl implementation has a bug')
         return None    
-    #     residual = np.sqrt(self.lc.N)/(self.lc.N - 1.)*\
+    #     residual = np.sqrt(self.lc.N)/(self.lc.n_epochs- 1.)*\
     #         (self.mag - self.lc.weighted_average)/self.err
     #     return np.sum(np.fabs(residual)
     #                   )/np.sqrt(self.lc.N*np.sum(residual**2))
@@ -100,7 +100,7 @@ class VariabilityIndex:
         """
         median absolute deviation
         """
-        if self.lc.N < 3:
+        if self.lc.n_epochs < self.lc.min_epochs:
             return None
         else:
             return ss.median_abs_deviation(self.lc.mag, nan_policy='omit')
@@ -110,7 +110,7 @@ class VariabilityIndex:
         """
         Raw Chi-square value
         """
-        if self.lc.N < 3:
+        if self.lc.n_epochs < self.lc.min_epochs:
             return None
         else:
             return np.sum((self.lc.mag - self.lc.weighted_average)**2 / self.lc.err**2)
@@ -121,7 +121,7 @@ class VariabilityIndex:
         Reduced Chi-square value:
         raw chi-square divided by the number of degrees of freedom (N-1)
         """
-        if self.lc.N < 3:
+        if self.lc.n_epochs < self.lc.min_epochs:
             return None
         else:
             return self.chi_square/(np.count_nonzero(
@@ -132,7 +132,7 @@ class VariabilityIndex:
         """
         inter-quartile range
         """
-        if self.lc.N < 3:
+        if self.lc.n_epochs < self.lc.min_epochs:
             return None
         else:
             return ss.iqr(self.lc.mag)
@@ -142,7 +142,7 @@ class VariabilityIndex:
         """
         Robust-Median Statistics (RoMS)
         """
-        return np.sum(np.abs(self.lc.mag - np.median(self.lc.mag))/self.lc.err)/(self.lc.N - 1)
+        return np.sum(np.abs(self.lc.mag - np.median(self.lc.mag))/self.lc.err)/(self.lc.n_epochs- 1)
     
     @property
     def normalised_excess_variance(self):
@@ -157,7 +157,7 @@ class VariabilityIndex:
 
     @property
     def norm_ptp(self):
-        if self.lc.N < 3:
+        if self.lc.n_epochs < self.lc.min_epochs:
             return None
         else:
             return (max(self.lc.mag - self.lc.err) - 
