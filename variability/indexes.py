@@ -58,7 +58,7 @@ class VariabilityIndex:
     @property
     def periodicity_index(self):
         if (self.lc.n_epochs > self.lc.min_epochs) and isinstance(self.lc, FoldedLightCurve):
-            return PeriodicityIndex(parent=self)
+            return PeriodicityIndex(parent=self).value
         else:
             # warn("Q-index is only available for folded light-curves")
             return None

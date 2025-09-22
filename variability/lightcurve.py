@@ -108,7 +108,7 @@ class LightCurve:
         Returns:
             float: light-curve time-span.
         """
-        if self.n_epochs < 3:
+        if self.n_epochs < self.min_epochs:
             return None
         else:
             return np.max(self.time) - np.min(self.time)
@@ -232,7 +232,7 @@ class LightCurve:
         Returns:
             float: Peak-to-peak amplitude.
         """
-        if self.n_epochs < 3:
+        if self.n_epochs < self.min_epochs:
             return None
         else:
             return np.max(self.mag) - np.min(self.mag)
@@ -245,7 +245,7 @@ class LightCurve:
     #     Returns:
     #         float: Range value.
     #     """
-    #     if self.n_epochs < 3:
+    #     if self.n_epochs < self.min_epochs:
     #         return None
     #     else:
     #         return self.mag.max() - self.mag.min()
@@ -264,6 +264,11 @@ class LightCurve:
             return None
         else:
             return self.std/self.mean_err
+
+    def get_timescale_properties(self):
+        # get the difference between consecutive time values
+        
+        pass
     
     def _list_properties(self):
         """
