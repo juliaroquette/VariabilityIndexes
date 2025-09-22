@@ -251,7 +251,7 @@ class LightCurve:
     #         return self.mag.max() - self.mag.min()
     
     @property
-    def SNR(self):
+    def signal_to_noise(self):
         """
         Returns the signal-to-noise ratio of the light curve
         defined as the ratio between the standard deviation of the magnitudes
