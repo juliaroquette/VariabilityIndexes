@@ -52,10 +52,10 @@ To instantiate a `LightCurve` object:
 
 ```python
   from variability.lightcurve import LightCurve
-  lc = LightCurve(time, mag, err, mask=None, is_flux=False, min_epochs=5)
+  lc = LightCurve(time, mag, err, mask=None, is_flux=False)
 ```
 
-Where the attributes `time`, `mag`, and `err` are numpy-arrays with the same length providing the observational time, magnitudes and magnitude uncertainties respectively. Optionally a `mask` boolean array can be passed to filter out missing data or spurious observations. The `is_flux` attribute informs if the light-curve is in terms of magnitudes or fluxes (this is important when calculating M-indexes.). `min_epochs=5` is the minimum number of epochs in the light curve for properties derived from statistics with the light curve to be calculated. 
+Where the attributes `time`, `mag`, and `err` are numpy-arrays with the same length providing the observational time, magnitudes and magnitude uncertainties respectively. Optionally a `mask` boolean array can be passed to filter out missing data or spurious observations. The `is_flux` attribute informs if the light-curve is in terms of magnitudes or fluxes (this is important when calculating M-indexes.). 
 
 `LightCurve` objects have a series of properties. To see the list of properties currently implemented, use:
 
@@ -63,10 +63,7 @@ Where the attributes `time`, `mag`, and `err` are numpy-arrays with the same len
 
 
 - `n_epochs` : Number of datapoints (number of epochs), $N$, in the light curve.
-- `std`: Standard deviation of the magnitudes [(uses bias corrected `numpy.std`)](https://numpy.org/doc/stable/reference/generated/numpy.std.html).
-$$
-\sigma = \sqrt{\frac{1}{N-1} \sum_{i=1}^{N} (x_i - \bar{x})^2}
-$$
+
 
 - `mean` : simple average of the magnitudes.
 
@@ -102,9 +99,6 @@ $$t_{max}-t_{min}$$
 <!--
 - `range`: another flavor of ptp amplitude bin in terms of maximum/minimum values of magnitude: $$x_{max}-x_{min}$$ 
 -->
-- `SNR` signal-to-noise ratio (standard deviation of the data divided by average uncertainty)
-
-$$\text{SNR}=\frac{\sigma}{\bar{\epsilon}}$$
 
 
 TODO:
@@ -203,16 +197,31 @@ To instantiate a `VariabilityIndex` object:
 ```python
 from variability.indexes import VariabilityIndex
 
-var = VariabilityIndex(lc_p, timescale=period)
+var = VariabilityIndex(lc_p, timescale=period, min_epochs=5)
 ```
 
-you are expected to pass in a `LightCurve` object, or a `FoldedLightCurve` object. However,  **note that some variability indexes, like the Q-index itself, require either a `timescale` argument or a `FoldedLightCurve` instance (which already have an instance `timescale`).
+you are expected to pass in a `LightCurve` object, or a `FoldedLightCurve` object. However,  **note that** some variability indexes, like the Q-index itself, require either a `timescale` argument or a `FoldedLightCurve` instance (which already have an instance `timescale`). `VariabilityIndex` requires a policy for minimum number of epochs in the light curve for properties derived from statistics with the light curve to be calculated, default to `min_epochs=5`. 
 
 The list of implemented variability indexes currently implemented can be accessed with:
 
 ``VariabilityIndex._list_properties()``
 
 ### 'Usual' Variability indexes:
+
+#### signal-to-noise ratio `SNR` 
+
+Defined here as the standard deviation of the data divided by average uncertainty.
+
+
+$$\text{SNR}=\frac{\sigma}{\bar{\epsilon}}$$
+
+
+#### Bias-corrected standard deviation
+
+`std`: Standard deviation of the magnitudes [(uses bias corrected `numpy.std`)](https://numpy.org/doc/stable/reference/generated/numpy.std.html).
+$$
+\sigma = \sqrt{\frac{1}{N-1} \sum_{i=1}^{N} (x_i - \bar{x})^2}
+$$
 
 #### Shapriro-Wilk test (`VariabilityIndex.shapiro_wilk`)
 
@@ -227,7 +236,7 @@ Expected behavior:
 - For symmetric variability, $W\lesssim1$. 
 - For highly asymmetric variability $W\ll 1$.
 
-**Note:** It is good as a complementary index for capture asymmetric variability behaviour. 
+**Note:** It is good as a complementary index for capture asymmetric variability behaviour. Note that this is used here as a ranking feature, rather than a statistical test, hence no p-value is returned.  
 
 #### median absolute deviation (MAD): (`VariabilityIndex.mad`)
 

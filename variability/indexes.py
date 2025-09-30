@@ -48,16 +48,55 @@ from variability.lightcurve import LightCurve, FoldedLightCurve
 
 
 class VariabilityIndex:
-    def __init__(self, lc, **kwargs):
+    def __init__(self, lc, min_epochs=5, **kwargs):
         if not isinstance(lc, LightCurve):
             raise TypeError("lc must be an instance of LightCurve")
         self.lc = lc
         self._params = kwargs.copy()
+        self.min_epochs = min_epochs
 
+    @property
+    def std(self):
+        """
+        Returns the standard deviation of the magnitude values.
+
+        Returns:
+            float: Standard deviation.
+        """
+        if self.lc.n_epochs < self.min_epochs:
+            return None
+        else:
+            return np.std(self.lc.mag,
+                        # ddof=1 makes sure std is bias-corrects
+                          # this means N-1 is used as the denominator rather than N
+                        ddof=1) 
+
+ 
+    @property
+    def signal_to_noise(self):
+        """
+        Returns the signal-to-noise ratio of the light curve
+        defined as the ratio between the standard deviation of the magnitudes
+        and the average uncertainty.
+
+        Returns:
+            float: Signal-to-noise ratio.
+        """
+        if self.lc.n_epochs < self.min_epochs:
+            return None
+        else:
+            return self.std/self.lc.mean_err
+
+    @property
+    def shapiro_wilk(self):
+        if self.lc.n_epochs > self.min_epochs:
+            return ss.shapiro(self.lc.mag)[0]
+        else:
+            return None
 
     @property
     def periodicity_index(self):
-        if (self.lc.n_epochs > self.lc.min_epochs) and isinstance(self.lc, FoldedLightCurve):
+        if (self.lc.n_epochs > self.min_epochs) and isinstance(self.lc, FoldedLightCurve):
             return PeriodicityIndex(parent=self).value
         else:
             # warn("Q-index is only available for folded light-curves")
@@ -68,7 +107,7 @@ class VariabilityIndex:
         # calculate M-index
         M_percentile = self._params.get('M_percentile', 10.)
         M_is_flux = self._params.get('M_is_flux', False)
-        if self.lc.n_epochs > self.lc.min_epochs:
+        if self.lc.n_epochs > self.min_epochs:
             return AsymmetryIndex(parent=self,percentile=M_percentile, is_flux=M_is_flux).value
         else:
             return None
@@ -79,7 +118,7 @@ class VariabilityIndex:
         Calculate Abbe value as in Mowlavi 2014A%26A...568A..78M
         https://www.aanda.org/articles/aa/full_html/2014/08/aa22648-13/aa22648-13.html
         """
-        if self.lc.n_epochs > self.lc.min_epochs:
+        if self.lc.n_epochs > self.min_epochs:
             return self.lc.n_epochs* np.sum((self.lc.mag[1:] - self.lc.mag[:-1])**2) /\
                 2 / np.sum((self.lc.mag - self.lc.mean)**2) / (self.lc.n_epochs- 1)
         else:
@@ -100,7 +139,7 @@ class VariabilityIndex:
 
     @property
     def shapiro_wilk(self):
-        if self.lc.n_epochs > self.lc.min_epochs:
+        if self.lc.n_epochs > self.min_epochs:
             return ss.shapiro(self.lc.mag)[0]
         else:
             return None
@@ -110,7 +149,7 @@ class VariabilityIndex:
         """
         median absolute deviation
         """
-        if self.lc.n_epochs < self.lc.min_epochs:
+        if self.lc.n_epochs < self.min_epochs:
             return None
         else:
             return ss.median_abs_deviation(self.lc.mag, nan_policy='omit')
@@ -120,7 +159,7 @@ class VariabilityIndex:
         """
         Raw Chi-square value
         """
-        if self.lc.n_epochs < self.lc.min_epochs:
+        if self.lc.n_epochs < self.min_epochs:
             return None
         else:
             return np.sum((self.lc.mag - self.lc.weighted_average)**2 / self.lc.err**2)
@@ -131,7 +170,7 @@ class VariabilityIndex:
         Reduced Chi-square value:
         raw chi-square divided by the number of degrees of freedom (N-1)
         """
-        if self.lc.n_epochs < self.lc.min_epochs:
+        if self.lc.n_epochs < self.min_epochs:
             return None
         else:
             return self.chi_square/(np.count_nonzero(
@@ -142,7 +181,7 @@ class VariabilityIndex:
         """
         inter-quartile range
         """
-        if self.lc.n_epochs < self.lc.min_epochs:
+        if self.lc.n_epochs < self.min_epochs:
             return None
         else:
             return ss.iqr(self.lc.mag)
@@ -152,21 +191,21 @@ class VariabilityIndex:
         """
         Robust-Median Statistics (RoMS)
         """
-        if self.lc.n_epochs > self.lc.min_epochs:
+        if self.lc.n_epochs > self.min_epochs:
             return np.sum(np.abs(self.lc.mag - np.median(self.lc.mag))/self.lc.err)/(self.lc.n_epochs- 1)
         else:
             return None
 
     @property
     def normalised_excess_variance(self):
-        if self.lc.n_epochs > self.lc.min_epochs:
+        if self.lc.n_epochs > self.min_epochs:
             return (self.lc.std**2 - self.lc.mean_err**2)/self.lc.mean**2
         else:
             return None
 
     @property
     def lag1_auto_corr(self):
-        if self.lc.n_epochs < self.lc.min_epochs:
+        if self.lc.n_epochs < self.min_epochs:
             return None
         else:
             return np.sum((self.lc.mag[:-1] - self.lc.mean) *
@@ -176,7 +215,7 @@ class VariabilityIndex:
 
     @property
     def norm_ptp(self):
-        if self.lc.n_epochs < self.lc.min_epochs:
+        if self.lc.n_epochs < self.min_epochs:
             return None
         else:
             return (max(self.lc.mag - self.lc.err) - 
@@ -185,21 +224,21 @@ class VariabilityIndex:
 
     @property
     def anderson_darling(self):
-        if self.lc.n_epochs < self.lc.min_epochs:
+        if self.lc.n_epochs < self.min_epochs:
             return None
         else:
             return ss.anderson(self.lc.mag)[0]
 
     @property
     def skewness(self):
-        if self.lc.n_epochs < self.lc.min_epochs:
+        if self.lc.n_epochs < self.min_epochs:
             return None
         else:
             return ss.skew(self.lc.mag, nan_policy='omit')
 
     @property
     def kurtosis(self):
-        if self.lc.n_epochs < self.lc.min_epochs:
+        if self.lc.n_epochs < self.min_epochs:
             return None
         else:
             return ss.kurtosis(self.lc.mag)
@@ -214,7 +253,7 @@ class VariabilityIndex:
         Returns:
             float: Peak-to-peak amplitude.
         """
-        if self.lc.n_epochs < self.lc.min_epochs:
+        if self.lc.n_epochs < self.min_epochs:
             return None
         else:
             return  self.ptp_perc(percentile=5.)
@@ -229,7 +268,7 @@ class VariabilityIndex:
         Returns:
             float: Peak-to-peak amplitude.
         """
-        if self.lc.n_epochs < self.lc.min_epochs:
+        if self.lc.n_epochs < self.min_epochs:
             return None
         else:
             return  self.ptp_perc(percentile=10.)
@@ -244,7 +283,7 @@ class VariabilityIndex:
         Returns:
             float: Peak-to-peak amplitude.
         """
-        if self.lc.n_epochs < self.lc.min_epochs:
+        if self.lc.n_epochs < self.min_epochs:
             return None
         else:
             return  self.ptp_perc(percentile=20.)
@@ -263,10 +302,15 @@ class VariabilityIndex:
         """
         if (percentile <= 0.) or (percentile >= 49.):
             raise ValueError("Please enter a valid percentile (between 0. and 49.)")
-        p = percentile/100.
-        tail = round(p * self.lc.n_epochs)
-        return  np.median(np.sort(self.lc.mag)[-tail:]) - np.median(np.sort(self.lc.mag)[:tail])               
-        
+        if self.lc.n_epochs < self.min_epochs:
+            return None
+        tail = int(np.floor(percentile * self.lc.n_epochs / 100.))
+        if tail > 1:
+            mag_sorted = np.sort(self.lc.mag)
+            return  np.median(mag_sorted[-tail:]) - np.median(mag_sorted[:tail])
+        else:
+            warn("Not enough epochs to calculate the peak-to-peak amplitude for the given percentile")
+            return None
 
     def _list_properties(self):
         """

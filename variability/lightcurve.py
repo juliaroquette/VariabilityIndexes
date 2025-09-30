@@ -30,7 +30,7 @@ from variability.filtering import WaveForm
  
 class LightCurve:
     """
-    Class representing a light curve.
+    Class representing a light curve. 
 
     Attributes:
         time (ndarray): Array of time values.
@@ -43,7 +43,6 @@ class LightCurve:
     Properties:
         - n_epochs (int): Number of datapoints in the light curve.
         - time_span (float): Total time-span of the light curve.
-        - std (float): Standard deviation of the magnitude values.
         - mean (float): Mean of the magnitude values.
         - weighted_average (float): Weighted average of the magnitude values.
         - median (float): Median of the magnitude values.
@@ -52,7 +51,6 @@ class LightCurve:
         - time_max (float): Maximum value of the observation times.
         - time_min (float): Minimum value of the observation times.
         - ptp (float): range of magnitude values (peak-to-peak amplitude).
-        - signal_to_noise (float): Signal-to-noise ratio of the light curve.
     """
 
     def __init__(self,
@@ -60,8 +58,7 @@ class LightCurve:
                  mag,
                  err,
                  mask=None,
-                 is_flux=False, 
-                 min_epochs=5):
+                 is_flux=False):
         """
         Initializes a LightCurve object.
 
@@ -88,7 +85,6 @@ class LightCurve:
         self.err = self.err[sorted_indices]        
         # keyword specifying if we are working in flux (relevant for M-index calculation)
         self.is_flux = is_flux
-        self.min_epochs = min_epochs
 
     @property    
     def n_epochs(self):
@@ -108,27 +104,8 @@ class LightCurve:
         Returns:
             float: light-curve time-span.
         """
-        if self.n_epochs < self.min_epochs:
-            return None
-        else:
-            return np.max(self.time) - np.min(self.time)
+        return np.max(self.time) - np.min(self.time)
     
-    @property
-    def std(self):
-        """
-        Returns the standard deviation of the magnitude values.
-
-        Returns:
-            float: Standard deviation.
-        """
-        if self.n_epochs < self.min_epochs:
-            return None
-        else:
-            return np.std(self.mag,
-                        # ddof=1 makes sure std is bias-corrects 
-                          # this means N-1 is used as the denominator rather than N 
-                        ddof=1) 
-
     @property
     def mean(self):
         """
@@ -157,10 +134,7 @@ class LightCurve:
         Returns:
             float: mags value.
         """
-        if self.n_epochs < self.min_epochs:
-            return None
-        else:
-            return self.mag.max()
+        return self.mag.max()
     
     @property
     def min(self):
@@ -170,10 +144,7 @@ class LightCurve:
         Returns:
             float: max mags value.
         """
-        if self.n_epochs < self.min_epochs:
-            return None
-        else:
-            return self.mag.min()
+        return self.mag.min()
     
     @property
     def time_max(self):
@@ -183,10 +154,7 @@ class LightCurve:
         Returns:
             float: max time value.
         """
-        if self.n_epochs < self.min_epochs:
-            return None
-        else:
-            return self.time.max()
+        return self.time.max()
     
     @property
     def time_min(self):
@@ -196,22 +164,7 @@ class LightCurve:
         Returns:
             float: min time value.
         """
-        if self.n_epochs < self.min_epochs:
-            return None
-        else:
-            return self.time.min()
-
-    @property
-    def weighted_average(self):
-        """
-        Returns the weighted average of the magnitude values.
-
-        Returns:
-            float: Weighted average.
-        """
-        # this avoids division by zero:
-        weights = np.clip(1./(self.err**2), 1e-12, None)
-        return np.average(self.mag, weights=weights)
+        return self.time.min()
 
     @property
     def median(self):
@@ -232,25 +185,23 @@ class LightCurve:
         Returns:
             float: Peak-to-peak amplitude.
         """
-        if self.n_epochs < self.min_epochs:
-            return None
+        ptp = np.max(self.mag) - np.min(self.mag)
+        if ptp > 0.:
+            return ptp
         else:
-            return np.max(self.mag) - np.min(self.mag)
+            return None
 
     @property
-    def signal_to_noise(self):
+    def weighted_average(self):
         """
-        Returns the signal-to-noise ratio of the light curve
-        defined as the ratio between the standard deviation of the magnitudes
-        and the average uncertainty.
+        Returns the weighted average of the magnitude values.
 
         Returns:
-            float: Signal-to-noise ratio.
+            float: Weighted average.
         """
-        if self.n_epochs < self.min_epochs:
-            return None
-        else:
-            return self.std/self.mean_err
+        # this avoids division by zero:
+        weights = np.clip(1./(self.err**2), 1e-12, None)
+        return np.average(self.mag, weights=weights)
 
     def get_timescale_properties(self):
         # get the difference between consecutive time values
@@ -281,9 +232,9 @@ class FoldedLightCurve(LightCurve):
             if not isinstance(lc, LightCurve):
                 raise TypeError("'lc' must be a LightCurve instance")
             else:
-                super().__init__(kwargs['time'], kwargs['mag'], kwargs['err'], kwargs.get('mask', None), kwargs.get('min_epochs', 5), kwargs.get('is_flux', False))
+                super().__init__(kwargs['time'], kwargs['mag'], kwargs['err'], kwargs.get('mask', None), kwargs.get('is_flux', False))
         elif all(key in kwargs for key in ['time', 'mag', 'err']):
-            super().__init__(kwargs['time'], kwargs['mag'], kwargs['err'], kwargs.get('mask', None), kwargs.get('min_epochs', 5), kwargs.get('is_flux', False))
+            super().__init__(kwargs['time'], kwargs['mag'], kwargs['err'], kwargs.get('mask', None), kwargs.get('is_flux', False))
         else:
             raise ValueError("Either a LightCurve object or time, mag and err arrays must be provided")
         # FoldedLightCurve needs a timescale
