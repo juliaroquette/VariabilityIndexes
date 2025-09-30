@@ -281,12 +281,12 @@ class FoldedLightCurve(LightCurve):
             if not isinstance(lc, LightCurve):
                 raise TypeError("'lc' must be a LightCurve instance")
             else:
-                super().__init__(kwargs['lc'].time, kwargs['lc'].mag, kwargs['lc'].err)
+                super().__init__(kwargs['time'], kwargs['mag'], kwargs['err'], kwargs.get('mask', None), kwargs.get('min_epochs', 5), kwargs.get('is_flux', False))
         elif all(key in kwargs for key in ['time', 'mag', 'err']):
-            super().__init__(kwargs['time'], kwargs['mag'], kwargs['err'], kwargs.get('mask', None))
+            super().__init__(kwargs['time'], kwargs['mag'], kwargs['err'], kwargs.get('mask', None), kwargs.get('min_epochs', 5), kwargs.get('is_flux', False))
         else:
             raise ValueError("Either a LightCurve object or time, mag and err arrays must be provided")
-        # FlodedLightCurve needs a timescale
+        # FoldedLightCurve needs a timescale
         if (not isinstance(timescale, (int, float))) or (timescale <= 0.):
             raise ValueError("FoldedLightCurve object requires a timescale (positive float/int value) to be defined.")
         else:
