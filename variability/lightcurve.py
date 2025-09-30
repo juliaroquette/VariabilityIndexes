@@ -52,13 +52,36 @@ class LightCurve:
         - time_min (float): Minimum value of the observation times.
         - ptp (float): range of magnitude values (peak-to-peak amplitude).
     """
+    # def __new__(cls, time, mag, err, **kwargs):
+    #     """
+    #     Tests if the minimum requirements to create a LightCurve object are met.
+    #     """
+    #      # check the shape
+    #     if time.shape != mag.shape or mag.shape != err.shape:
+    #         raise ValueError("time, mag, and err must all have the same shape")
+    #     # check that there is at least one finite value in time, mag and err       
+    #     finite = np.isfinite([time, mag, err])
+    #     # check the mask provided if valid
+    #     if 'mask' in kwargs:
+    #         mask = kwargs['mask']
+    #         if (len(mask) == len(time)) and (np.asarray(mask).dtype == bool):
+    #             finite = finite[:, mask]
+    #         else:
+    #             warnings.warn("mask must be a boolean array of the same length as time, mag and err. Ignoring mask.")
+    #             return None
+            
+    #     if not finite.any():
+    #         # abort construction → caller gets None
+    #         return None
 
+    #     # otherwise proceed with normal instance creation
+    #     return super().__new__(cls)        
+        
     def __init__(self,
                  time,
                  mag,
                  err,
-                 mask=None,
-                 is_flux=False):
+                 mask=None):
         """
         Initializes a LightCurve object.
 
@@ -69,9 +92,11 @@ class LightCurve:
             mask (ndarray, optional): Array of boolean values indicating which data points to include. Defaults to None.
         """
         if mask is None:
-            mask = np.where(np.all(np.isfinite([mag, time, err]), axis=0))[0]
-        else:
+            mask = np.all(np.isfinite([mag, time, err]), axis=0)
+        elif (len(mask) == len(time)) and (np.asarray(mask).dtype == bool):
             mask = np.asarray(mask, dtype=bool)
+        else:
+            raise ValueError("mask must be a boolean array of the same length as time, mag and err")
 
         self.time = np.asarray(time, dtype=float)[mask]
         self.mag = np.asarray(mag, dtype=float)[mask]
@@ -82,9 +107,7 @@ class LightCurve:
         sorted_indices = np.argsort(self.time)
         self.time = self.time[sorted_indices]
         self.mag = self.mag[sorted_indices]
-        self.err = self.err[sorted_indices]        
-        # keyword specifying if we are working in flux (relevant for M-index calculation)
-        self.is_flux = is_flux
+        self.err = self.err[sorted_indices]
 
     @property    
     def n_epochs(self):
@@ -222,19 +245,23 @@ class FoldedLightCurve(LightCurve):
     """
     Represents a folded light curve with time values folded for a given timescale.
     """
+    # Control for warnings
+    _suppress_warnings = False
     def __init__(self,
                  timescale=None,
                  **kwargs):
-        self._suppress_warnings = False
+        
         # makes sure this is also a LightCurve object
         if 'lc' in kwargs:
             lc = kwargs['lc']
             if not isinstance(lc, LightCurve):
                 raise TypeError("'lc' must be a LightCurve instance")
             else:
-                super().__init__(kwargs['time'], kwargs['mag'], kwargs['err'], kwargs.get('mask', None), kwargs.get('is_flux', False))
+                super().__init__(lc.time, lc.mag, lc.err,
+                                 getattr(lc, 'mask', None))
         elif all(key in kwargs for key in ['time', 'mag', 'err']):
-            super().__init__(kwargs['time'], kwargs['mag'], kwargs['err'], kwargs.get('mask', None), kwargs.get('is_flux', False))
+            super().__init__(kwargs['time'], kwargs['mag'], kwargs['err'],
+                     kwargs.get('mask', None))
         else:
             raise ValueError("Either a LightCurve object or time, mag and err arrays must be provided")
         # FoldedLightCurve needs a timescale
@@ -350,9 +377,6 @@ class FoldedLightCurve(LightCurve):
             self._waveform_params = waveform_params
         self._get_waveform()
     
-        
-        
-        
     def _list_properties(self):
         """
         list properties of the class LightCurve
