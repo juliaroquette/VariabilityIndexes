@@ -188,8 +188,9 @@ class LightCurve:
         Returns:
             float: Peak-to-peak amplitude.
         """
+        # ptp can only be zero if all values are the same        
         ptp = np.max(self.mag) - np.min(self.mag)
-        if ptp > 0.:
+        if len(self.mag) > 1:
             return ptp
         else:
             return None
@@ -253,7 +254,7 @@ class FoldedLightCurve(LightCurve):
                 
         # phasefold lightcurves have a waveform
         self._waveform_type = kwargs.get('waveform_type', 'uneven_savgol')
-        self._waveform_params = kwargs.get('waveform_params', {'window': round(.25*self.n_epochs), 'polynom': 2})
+        self._waveform_params = kwargs.get('waveform_params', {'window': round(.25*self.n_epochs), 'polyorder': 2})
         self._get_waveform()
 
 
@@ -1434,7 +1435,7 @@ class ObservationalWindow:
         time = np.arange(0, timespan, cadence)
         waveform_type = "uneven_savgol"
         waveform_params = {'window': round(.1*len(time)),
-                                                    'polynom': 3}
+                                                    'polyorder': 3}
         return time, faint, bright, waveform_type, waveform_params
 
     def _CoRoT_window(self):
@@ -1453,7 +1454,7 @@ class ObservationalWindow:
         time = np.arange(0, timespan, cadence)
         waveform_type = "uneven_savgol"
         waveform_params = {'window': round(.1*len(time)),
-                                                    'polynom': 3}
+                                                    'polyorder': 3}
         return time, faint, bright, waveform_type, waveform_params
     
     def _TESS_window(self):
@@ -1464,7 +1465,7 @@ class ObservationalWindow:
         time = self.read_observational_window('TESS')
         waveform_type = "uneven_savgol"
         waveform_params = {'window': round(.1*len(time)),
-                                                    'polynom': 3}
+                                                    'polyorder': 3}
         return time, faint, bright, waveform_type, waveform_params
 
     def _Rubin_window(self):
@@ -1478,7 +1479,7 @@ class ObservationalWindow:
         time = self.read_observational_window('ZTF')
         waveform_type = "uneven_savgol"
         waveform_params = {'window': round(.25*len(time)),
-                                                    'polynom': 3}
+                                                    'polyorder': 3}
         return time, faint, bright, waveform_type, waveform_params
         
     def _ASAS_SN_V_window(self):
@@ -1490,7 +1491,7 @@ class ObservationalWindow:
         time = self.read_observational_window('ASAS-SN-V')
         waveform_type = "uneven_savgol"
         waveform_params = {'window': round(.25*len(time)),
-                                                    'polynom': 3}
+                                                    'polyorder': 3}
         return time, faint, bright, waveform_type, waveform_params
 
     def _ASAS_SN_g_window(self):
@@ -1502,7 +1503,7 @@ class ObservationalWindow:
         time = self.read_observational_window('ASAS-SN-g')
         waveform_type = "uneven_savgol"
         waveform_params = {'window': round(.25*len(time)),
-                                                    'polynom': 3}
+                                                    'polyorder': 3}
         return time, faint, bright, waveform_type, waveform_params
     
     def _GaiaDR3_window(self):
@@ -1514,7 +1515,7 @@ class ObservationalWindow:
         time = self.read_observational_window('GaiaDR3')
         waveform_type = "uneven_savgol"
         waveform_params = {'window': round(.25*len(time)),
-                                                    'polynom': 3}
+                                                    'polyorder': 3}
         return time, faint, bright, waveform_type, waveform_params
                 
     def _GaiaDR4_window(self):
@@ -1525,7 +1526,7 @@ class ObservationalWindow:
         time = self.read_observational_window('GaiaDR4')
         waveform_type = "uneven_savgol"
         waveform_params = {'window': round(.25*len(time)),
-                                                    'polynom': 3}
+                                                    'polyorder': 3}
         return time, faint, bright, waveform_type, waveform_params
              
     def _GaiaDR4_geq20_window(self):
@@ -1536,7 +1537,7 @@ class ObservationalWindow:
         time = self.read_observational_window('GaiaDR4-geq20')     
         waveform_type = "uneven_savgol"
         waveform_params = {'window': round(.25*len(time)),
-                                                    'polynom': 3}
+                                                    'polyorder': 3}
         return time, faint, bright, waveform_type, waveform_params
     
     def _GaiaDR5_window(self):        
@@ -1548,7 +1549,7 @@ class ObservationalWindow:
         time = self.read_observational_window('GaiaDR5')            
         waveform_type = "uneven_savgol"
         waveform_params = {'window': round(.25*len(time)),
-                                                    'polynom': 3}
+                                                    'polyorder': 3}
         return time, faint, bright, waveform_type, waveform_params
     
     def _AllWISE_window(self):
@@ -1559,7 +1560,7 @@ class ObservationalWindow:
         time = self.read_observational_window('AllWISE')
         waveform_type = "uneven_savgol"
         waveform_params = {'window': round(.25*len(time)),
-                                                    'polynom': 3}
+                                                    'polyorder': 3}
         return time, faint, bright, waveform_type, waveform_params
     
     def __str__(self) -> str:

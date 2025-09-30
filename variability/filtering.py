@@ -29,7 +29,7 @@ class Filtering:
             - 'savgol': Apply the Savitzky-Golay filter to remove long-term trends.
                 - **kwargs:
                     - timescale (int): The length of the filter window.
-                    - polynom (int): The order of the polynomial used to fit the samples.
+                    - polyorder (int): The order of the polynomial used to fit the samples.
             - 'Cody': Apply the Cody filter to remove long-term trends.
                 - **kwargs:
                     - window_length (int): The length of the filter window.
@@ -104,19 +104,19 @@ class Filtering:
         return scipy.ndimage.median_filter(self.lc.mag, size=window, mode='nearest')
     
         
-    def savgol_longtrend(self, timescale=10., polynom=3) :
+    def savgol_longtrend(self, timescale=10., polyorder=3) :
         """
         To be changed to timescale rather than window size
         """
         if not self.even:
             warnings.warn("SavGol Scipy expects even time series - which may not be true here.", UserWarning)        
         window = self.get_num_time(timescale)
-        return sp.signal.savgol_filter(self.lc.mag, window, polynom)
+        return sp.signal.savgol_filter(self.lc.mag, window, polyorder)
     
-    def uneven_savgol(self, window, polynom):
+    def uneven_savgol(self, window, polyorder):
         x = self.lc.time
         y = self.lc.mag
-        return uneven_savgol(x, y, window, polynom)
+        return uneven_savgol(x, y, window, polyorder)
     
     def smooth_per_timescale(self, window_days=10.):
         """
@@ -203,8 +203,8 @@ class WaveForm:
         
         return extended_waveform[self.N - half_window: 2 * self.N - half_window]
         
-    def savgol(self, window=10, polynom=3):
-        return sp.signal.savgol_filter(self.mag_phased, window, polynom)
+    def savgol(self, window=10, polyorder=3):
+        return sp.signal.savgol_filter(self.mag_phased, window, polyorder)
 
     def circular_rolling_average_phase(self, wd_phase=0.1):
         """
@@ -240,13 +240,13 @@ class WaveForm:
     def waveform_Cody(self, n_point=50):
         return sp.ndimage.median_filter(self.mag_phased, size=n_point, mode='wrap')   
     
-    def uneven_savgol(self, window, polynom):
+    def uneven_savgol(self, window, polyorder):
         """
         Apply a Savitzky-Golay filter to the folded light curve with non-uniform spacing.
 
         Parameters:
         - window (int): Window length of datapoints. Must be odd and smaller than the light curve size.
-        - polynom (int): The order of polynomial used. Must be smaller than the window size.
+        - polyorder (int): The order of polynomial used. Must be smaller than the window size.
 
         Returns:
         - np.array: The smoothed folded light curve.
@@ -257,14 +257,14 @@ class WaveForm:
         """
         x = np.concatenate((self.phase - 1., self.phase, 1. + self.phase))
         y = np.concatenate((self.mag_phased, self.mag_phased, self.mag_phased)) 
-        # print(f"Debugging uneven_savgol with window={window}, polynom={polynom}")
-        return  uneven_savgol(x, y, window, polynom)  [self.N:2*self.N]
+        # print(f"Debugging uneven_savgol with window={window}, polyorder={polyorder}")
+        return  uneven_savgol(x, y, window, polyorder)  [self.N:2*self.N]
     
     def get_waveform(self, waveform_type='uneven_savgol', waveform_params={}):
         if waveform_type == 'savgol':
             window = waveform_params.get('window', 25.)
-            polynom = waveform_params.get('polynom', 3)
-            waveform = self.savgol(window=window, polynom=polynom)
+            polyorder = waveform_params.get('polyorder', 3)
+            waveform = self.savgol(window=window, polyorder=polyorder)
         elif waveform_type == 'Cody':
             n_point = waveform_params.get('n_point',50)
             waveform = self.waveform_Cody(n_point=n_point)
@@ -283,10 +283,10 @@ class WaveForm:
             window = int(round(window))
             if window % 2 == 0:
                 window += 1
-            polynom = waveform_params.get('polynom', 1)
-            while polynom >= window:
+            polyorder = waveform_params.get('polyorder', 1)
+            while polyorder >= window:
                 window += 2
-            waveform = self.uneven_savgol(window, polynom)
+            waveform = self.uneven_savgol(window, polyorder)
         else:
             raise ValueError(f"Method '{waveform_type}' not implemented.")
         return waveform
@@ -297,7 +297,7 @@ class WaveForm:
         """
         return self.mag_phased - waveform
 
-# def uneven_savgol_(x, y, window, polynom):
+# def uneven_savgol_(x, y, window, polyorder):
 #     """
 #     Applies a Savitzky-Golay filter to y with non-uniform spacing
 #     as defined in x
@@ -309,7 +309,7 @@ class WaveForm:
 #     ----------
 #     window : int (odd)
 #         Window length of datapoints. Must be odd and smaller than x
-#     polynom : int
+#     polyorder : int
 #         The order of polynom used. Must be smaller than the window size
 
 #     Returns
@@ -328,18 +328,18 @@ class WaveForm:
 #     if window % 2 == 0:
 #         raise ValueError('The "window" must be an odd integer')
 
-#     if type(polynom) is not int:
-#         raise TypeError('"polynom" must be an integer')
+#     if type(polyorder) is not int:
+#         raise TypeError('"polyorder" must be an integer')
 
-#     if polynom >= window:
-#         raise ValueError('"polynom" must be less than "window"')
+#     if polyorder >= window:
+#         raise ValueError('"polyorder" must be less than "window"')
 
 #     half_window = window // 2
-#     polynom += 1
+#     polyorder += 1
 
 #     # Initialize variables
-#     A = np.empty((window, polynom))     # Matrix
-#     tA = np.empty((polynom, window))    # Transposed matrix
+#     A = np.empty((window, polyorder))     # Matrix
+#     tA = np.empty((polyorder, window))    # Transposed matrix
 #     t = np.empty(window)                # Local x variables
 #     y_smoothed = np.full(len(y), np.nan)
 
@@ -352,7 +352,7 @@ class WaveForm:
 #         # Create the initial matrix A and its transposed form tA
 #         for j in range(0, window, 1):
 #             r = 1.0
-#             for k in range(0, polynom, 1):
+#             for k in range(0, polyorder, 1):
 #                 A[j, k] = r
 #                 tA[k, j] = r
 #                 r *= t[j]
@@ -371,23 +371,23 @@ class WaveForm:
 #         for j in range(0, window, 1):
 #             y_smoothed[i] += coeffs[0, j] * y[i + j - half_window]
 
-#         # If at the end or beginning, store all coefficients for the polynom
+#         # If at the end or beginning, store all coefficients for the polyorder
 #         if i == half_window:
-#             first_coeffs = np.zeros(polynom)
+#             first_coeffs = np.zeros(polyorder)
 #             for j in range(0, window, 1):
-#                 for k in range(polynom):
+#                 for k in range(polyorder):
 #                     first_coeffs[k] += coeffs[k, j] * y[j]
 #         elif i == len(x) - half_window - 1:
-#             last_coeffs = np.zeros(polynom)
+#             last_coeffs = np.zeros(polyorder)
 #             for j in range(0, window, 1):
-#                 for k in range(polynom):
+#                 for k in range(polyorder):
 #                     last_coeffs[k] += coeffs[k, j] * y[len(y) - window + j]
 
 #     # Interpolate the result at the left border
 #     for i in range(0, half_window, 1):
 #         y_smoothed[i] = 0
 #         x_i = 1
-#         for j in range(0, polynom, 1):
+#         for j in range(0, polyorder, 1):
 #             y_smoothed[i] += first_coeffs[j] * x_i
 #             x_i *= x[i] - x[half_window]
 
@@ -395,13 +395,13 @@ class WaveForm:
 #     for i in range(len(x) - half_window, len(x), 1):
 #         y_smoothed[i] = 0
 #         x_i = 1
-#         for j in range(0, polynom, 1):
+#         for j in range(0, polyorder, 1):
 #             y_smoothed[i] += last_coeffs[j] * x_i
 #             x_i *= x[i] - x[-half_window - 1]
 
 #     return y_smoothed
 
-def uneven_savgol(x, y, window, polynom):
+def uneven_savgol(x, y, window, polyorder):
     """
     Applies a Savitzky-Golay filter to y with non-uniform spacing
     as defined in x
@@ -413,7 +413,7 @@ def uneven_savgol(x, y, window, polynom):
     ----------
     window : int (odd)
         Window length of datapoints. Must be odd and smaller than x
-    polynom : int
+    polyorder : int
         The order of polynom used. Must be smaller than the window size
 
     Returns
@@ -432,23 +432,23 @@ def uneven_savgol(x, y, window, polynom):
     if window % 2 == 0:
         raise ValueError('The "window" must be an odd integer')
 
-    if not isinstance(polynom, int):
-        raise TypeError('"polynom" must be an integer')
+    if not isinstance(polyorder, int):
+        raise TypeError('"polyorder" must be an integer')
 
-    if polynom >= window:
-        raise ValueError('"polynom" must be less than "window"')
+    if polyorder >= window:
+        raise ValueError('"polyorder" must be less than "window"')
 
     half_window = window // 2
-    polynom += 1
+    polyorder += 1
     
     # Initialize variables
     t = np.empty(window)                # Local x variables
     y_smoothed = np.full(len(y), np.nan)
 
     # Calculate powers of t
-    powers_of_t = np.empty((window, polynom))
+    powers_of_t = np.empty((window, polyorder))
     for j in range(window):
-        powers_of_t[j] = np.power(x[half_window + j] - x[half_window], np.arange(polynom))
+        powers_of_t[j] = np.power(x[half_window + j] - x[half_window], np.arange(polyorder))
 
     # Start smoothing
     for i in range(half_window, len(x) - half_window):
@@ -456,7 +456,7 @@ def uneven_savgol(x, y, window, polynom):
         t = x[i - half_window:i + half_window + 1] - x[i]
 
         # Create the initial matrix A and its transposed form tA
-        A = np.vander(t, polynom, increasing=True)
+        A = np.vander(t, polyorder, increasing=True)
         tA = A.T
 
         # Multiply the two matrices
