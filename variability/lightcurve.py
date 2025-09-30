@@ -49,31 +49,21 @@ class LightCurve:
         - time_min (float): Minimum value of the observation times.
         - ptp (float): range of magnitude values (peak-to-peak amplitude).
     """
-    # def __new__(cls, time, mag, err, **kwargs):
-    #     """
-    #     Tests if the minimum requirements to create a LightCurve object are met.
-    #     """
-    #      # check the shape
-    #     if time.shape != mag.shape or mag.shape != err.shape:
-    #         raise ValueError("time, mag, and err must all have the same shape")
-    #     # check that there is at least one finite value in time, mag and err       
-    #     finite = np.isfinite([time, mag, err])
-    #     # check the mask provided if valid
-    #     if 'mask' in kwargs:
-    #         mask = kwargs['mask']
-    #         if (len(mask) == len(time)) and (np.asarray(mask).dtype == bool):
-    #             finite = finite[:, mask]
-    #         else:
-    #             warnings.warn("mask must be a boolean array of the same length as time, mag and err. Ignoring mask.")
-    #             return None
-            
-    #     if not finite.any():
-    #         # abort construction → caller gets None
-    #         return None
+    def __new__(cls, time, mag, err):
+        """
+        Tests if the minimum requirements to create a LightCurve object are met.
+        """
+        # check the shape
+        if len(time) != len(mag) or len(mag) != len(err):
+            raise ValueError("time, mag, and err must all have the same shape")
+        # check that there is at least one finite value in time, mag and err
+        finite = np.isfinite(time) & np.isfinite(mag) & np.isfinite(err)
+        if not finite.any():
+            # abort construction → caller gets None
+            return None
+        # otherwise proceed with normal instance creation
+        return super().__new__(cls)
 
-    #     # otherwise proceed with normal instance creation
-    #     return super().__new__(cls)        
-        
     def __init__(self,
                  time,
                  mag,
@@ -87,7 +77,7 @@ class LightCurve:
             err (ndarray): Array of error values.
         """
         # check time, mag, err are all valid
-        mask = np.all(np.isfinite([mag, time, err]), axis=0)
+        mask = np.isfinite(time) & np.isfinite(mag) & np.isfinite(err)
         self.time = np.asarray(time, dtype=float)[mask]
         self.mag = np.asarray(mag, dtype=float)[mask]
         self.err = np.asarray(err, dtype=float)[mask]
