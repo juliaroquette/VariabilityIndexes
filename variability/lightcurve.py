@@ -36,9 +36,6 @@ class LightCurve:
         time (ndarray): Array of time values.
         mag (ndarray): Array of magnitude values.
         err (ndarray): Array of magnitude error values.
-        mask (ndarray): Array of boolean values indicating valid datapoints. 
-                        if no mask is provided, all finite values existing
-                        in time, mag and err are considered valid.
     
     Properties:
         - n_epochs (int): Number of datapoints in the light curve.
@@ -80,8 +77,7 @@ class LightCurve:
     def __init__(self,
                  time,
                  mag,
-                 err,
-                 mask=None):
+                 err):
         """
         Initializes a LightCurve object.
 
@@ -89,15 +85,9 @@ class LightCurve:
             time (ndarray): Array of time values.
             mag (ndarray): Array of magnitude values.
             err (ndarray): Array of error values.
-            mask (ndarray, optional): Array of boolean values indicating which data points to include. Defaults to None.
         """
-        if mask is None:
-            mask = np.all(np.isfinite([mag, time, err]), axis=0)
-        elif (len(mask) == len(time)) and (np.asarray(mask).dtype == bool):
-            mask = np.asarray(mask, dtype=bool)
-        else:
-            raise ValueError("mask must be a boolean array of the same length as time, mag and err")
-
+        # check time, mag, err are all valid
+        mask = np.all(np.isfinite([mag, time, err]), axis=0)
         self.time = np.asarray(time, dtype=float)[mask]
         self.mag = np.asarray(mag, dtype=float)[mask]
         self.err = np.asarray(err, dtype=float)[mask]
@@ -257,11 +247,9 @@ class FoldedLightCurve(LightCurve):
             if not isinstance(lc, LightCurve):
                 raise TypeError("'lc' must be a LightCurve instance")
             else:
-                super().__init__(lc.time, lc.mag, lc.err,
-                                 getattr(lc, 'mask', None))
+                super().__init__(lc.time, lc.mag, lc.err)
         elif all(key in kwargs for key in ['time', 'mag', 'err']):
-            super().__init__(kwargs['time'], kwargs['mag'], kwargs['err'],
-                     kwargs.get('mask', None))
+            super().__init__(kwargs['time'], kwargs['mag'], kwargs['err'])
         else:
             raise ValueError("Either a LightCurve object or time, mag and err arrays must be provided")
         # FoldedLightCurve needs a timescale
