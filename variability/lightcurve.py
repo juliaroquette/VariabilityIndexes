@@ -297,7 +297,7 @@ class FoldedLightCurve(LightCurve):
                 
         # phasefold lightcurves have a waveform
         self._waveform_type = kwargs.get('waveform_type', 'uneven_savgol')
-        self._waveform_params = kwargs.get('waveform_params', {'window': round(.25*self.n_epochs), 'polynom': 1})
+        self._waveform_params = kwargs.get('waveform_params', {'window': round(.25*self.n_epochs), 'polynom': 2})
         self._get_waveform()
 
 
@@ -380,6 +380,28 @@ class FoldedLightCurve(LightCurve):
             self._waveform_params = waveform_params
         self._get_waveform()
     
+    def refold(self, *, timescale=None, reference_time=None,
+            waveform_type=None, waveform_params=None):
+        changed_phase = False
+        if timescale is not None:
+            if not isinstance(timescale, (int, float)) or timescale <= 0:
+                raise ValueError("timescale must be a positive number")
+            self._timescale = float(timescale); changed_phase = True
+        if reference_time is not None:
+            if not isinstance(reference_time, (int, float)):
+                raise ValueError("reference_time must be numeric")
+            self._reference_time = float(reference_time); changed_phase = True
+        if changed_phase:
+            self._get_phased_values()
+        if waveform_type is not None:
+            self._waveform_type = waveform_type
+        if waveform_params is not None:
+            self._waveform_params = waveform_params
+        self._get_waveform()
+    
+        
+        
+        
     def _list_properties(self):
         """
         list properties of the class LightCurve
@@ -413,9 +435,13 @@ class FoldedLightCurve(LightCurve):
 
     def __repr__(self):
         return (f"<FoldedLightCurve(timescale={self._timescale}, "
-            f"waveform_type={self._waveform_type}, "
-            f"N={self.n_epochs})>")
-    
+                f"reference_time={self._reference_time}, "
+                f"waveform_type={self._waveform_type}, "
+                f"N={self.n_epochs})>")
+
+    def __len__(self):
+        return self.n_epochs
+
 class SyntheticLightCurve:
     """
     A class to generate synthetic light curves.
