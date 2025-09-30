@@ -41,7 +41,7 @@ class LightCurve:
                         in time, mag and err are considered valid.
     
     Properties:
-        - N (int): Number of datapoints in the light curve.
+        - n_epochs (int): Number of datapoints in the light curve.
         - time_span (float): Total time-span of the light curve.
         - std (float): Standard deviation of the magnitude values.
         - mean (float): Mean of the magnitude values.
@@ -51,9 +51,8 @@ class LightCurve:
         - max (float): Maximum value of the magnitudes.
         - time_max (float): Maximum value of the observation times.
         - time_min (float): Minimum value of the observation times.
-        - ptp (float): Peak-to-peak amplitude of the magnitude values. 
-                       Defined as the difference between the median values for the datapoints 
-                       in the 5% outermost tails of the distribution.
+        - ptp (float): range of magnitude values (peak-to-peak amplitude).
+        - signal_to_noise (float): Signal-to-noise ratio of the light curve.
     """
 
     def __init__(self,
@@ -72,10 +71,11 @@ class LightCurve:
             err (ndarray): Array of error values.
             mask (ndarray, optional): Array of boolean values indicating which data points to include. Defaults to None.
         """
-        if bool(mask):
-            mask = np.asarray(mask, dtype=bool)
-        else:
+        if mask is None:
             mask = np.where(np.all(np.isfinite([mag, time, err]), axis=0))[0]
+        else:
+            mask = np.asarray(mask, dtype=bool)
+
         self.time = np.asarray(time, dtype=float)[mask]
         self.mag = np.asarray(mag, dtype=float)[mask]
         self.err = np.asarray(err, dtype=float)[mask]
@@ -237,19 +237,6 @@ class LightCurve:
         else:
             return np.max(self.mag) - np.min(self.mag)
 
-    # @property
-    # def range(self):
-    #     """
-    #     Returns the range of the magnitude values.
-
-    #     Returns:
-    #         float: Range value.
-    #     """
-    #     if self.n_epochs < self.min_epochs:
-    #         return None
-    #     else:
-    #         return self.mag.max() - self.mag.min()
-    
     @property
     def signal_to_noise(self):
         """
@@ -287,7 +274,7 @@ class FoldedLightCurve(LightCurve):
     def __init__(self,
                  timescale=None,
                  **kwargs):
-        
+        self._suppress_warnings = False
         # makes sure this is also a LightCurve object
         if 'lc' in kwargs:
             lc = kwargs['lc']
@@ -375,9 +362,6 @@ class FoldedLightCurve(LightCurve):
         """
         Derives the waveform and update the residual curve
         """
-        # print('Debugging FoldedLightCurve._get_waveform()')
-        # print(f'Waveform type: {self._waveform_type}')
-        # print(f'Waveform params: {self._waveform_params}')
         wf = WaveForm(self.phase, self.mag_phased)
         self.waveform = wf.get_waveform(
             waveform_type=self._waveform_type,
