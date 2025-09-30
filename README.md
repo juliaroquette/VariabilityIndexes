@@ -1,6 +1,6 @@
 # A Python package for deriving variability features from any kind of light-curves
 
-**@juliaroquette** Package under development for deriving Q&M indexes (and a few other variability indexes) for any time type of light-curves. 
+**@juliaroquette** Package under development for variability indexes for any time type of light-curves. 
 
 
 **Last Update**: (18th September 2025) improved both implementation and documentation of variability indexes.
@@ -20,10 +20,11 @@ TO DO:
 
 # `lightcurve` module:
 
-Provides tools for loading light-curves as objects. Three distinct classes related to light-curves are currently included: 
-- `LightCurve`s are the simplest light-curves
-- `FoldedLightCurve`s are phase-folded light-curves with a known timescale
-- `SyntheticLightCurve` (under construction) provide a suite of models of light-curves for different variability modes and survey fingerprints. 
+Provides tools for loading light curves as objects. Three distinct classes related to light curves are currently included: 
+- `LightCurve`s are the simplest light curves
+- `FoldedLightCurve`s are phase-folded light curves with a known timescale
+- `SyntheticLightCurve` (under construction) provide a suite of models of light curves for different variability modes and survey fingerprints. 
+- `MultiBandLighCurve`  (not implemented yet) deals with (quasi-)simultaneous multiband light curves.
 
 Throughout this documentation, we approach an observed light-curve as:
 
@@ -95,11 +96,12 @@ Uses [`np.median`](https://numpy.org/doc/stable/reference/generated/numpy.nanmed
 - `ptp`: Peak-to-peak amplitude of the magnitude values. Simply define as the difference between the max and min (range) of magnitudes, $x_{max}-x_{min}$ . (for more robust definitions see the `VariabilityIndex` class below)
 - `time_max`: Maximum value of the observation times ($t_{max}$).
 - `time_min`: Minimum value of the observation times ($t_{min}$).
-<!--- `time_span`: Total time-span of the light curve
+- `time_span`: Total time-span of the light curve
  
 $$t_{max}-t_{min}$$ 
--->
+<!--
 - `range`: another flavor of ptp amplitude bin in terms of maximum/minimum values of magnitude: $$x_{max}-x_{min}$$ 
+-->
 - `SNR` signal-to-noise ratio (standard deviation of the data divided by average uncertainty)
 
 $$\text{SNR}=\frac{\sigma}{\bar{\epsilon}}$$
@@ -138,6 +140,12 @@ Additionally to the attributes inherited from the `LightCurve`object, a `FoldedL
 - `residual`: residual phase-folded curve (`mag_phased - waveform`)
 
 All returned values are sorted as a function of phase value. 
+
+`FoldedLightCurve` requires a `timescale`, and uses as default the `uneven_savgol` waveform estimator, which requires parameters for window size (`window` set to 25\% the number of epochs as default) and the order of the polynomial fit used by the SavGol method (`polynom=1`). Additionally, unless specified, `reference_time` is set to 0 when phase folding the light curve. Al these parameters can be updated on the go by the `lc_f.refold(timescale=None, reference_time=None, waveform_type=None, waveform_params=None)` method. For example, below, the `FoldedLightCurve` has its waveform estimator updated by keeping the `unevel_savgol` method, but using a polynomial of order 1 and a window with 10 epochs.
+
+```python
+lc_f.refold(waveform_type='uneven_savgol', waveform_params={'polynom':1, 'window':10})
+```
 
 
 ## `SyntheticLightCurve`
@@ -184,9 +192,9 @@ from variability.lightcurve import FoldedLightCurve
 
 # Variability Indexes
 
-Include a suite of widely used variability indexes. A great review on this subject is providedby  [Sokolovsky et al. (2017)](https://academic.oup.com/mnras/article-lookup/doi/10.1093/mnras/stw2262) with several of the indexes implemented here discussed there with appropriate references. 
+Include a suite of widely used variability indexes. A great review on this subject is providedby  [Sokolovsky et al. (2017)](https://academic.oup.com/mnras/article-lookup/doi/10.1093/mnras/stw2262) with several of the indexes implemented here discussed there with appropriate referencing. Here, `VariabilityIndex` concentrates on magnitude-domain features. (for time-domain features, see `TimeScale`).
 
-## `indexes`
+## `VariabilityIndex`
 
 
 
