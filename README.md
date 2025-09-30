@@ -52,10 +52,10 @@ To instantiate a `LightCurve` object:
 
 ```python
   from variability.lightcurve import LightCurve
-  lc = LightCurve(time, mag, err, mask=None, is_flux=False)
+  lc = LightCurve(time, mag, err)
 ```
 
-Where the attributes `time`, `mag`, and `err` are numpy-arrays with the same length providing the observational time, magnitudes and magnitude uncertainties respectively. Optionally a `mask` boolean array can be passed to filter out missing data or spurious observations. The `is_flux` attribute informs if the light-curve is in terms of magnitudes or fluxes (this is important when calculating M-indexes.). 
+Where the attributes `time`, `mag`, and `err` are numpy-arrays with the same length providing the observational time, magnitudes and magnitude uncertainties respectively. 
 
 `LightCurve` objects have a series of properties. To see the list of properties currently implemented, use:
 
