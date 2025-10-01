@@ -20,18 +20,11 @@ from variability.lightcurve import LightCurve
 from variability.structure_function import StructureFunction
 
 
-class TimeScale_refactored(LightCurve):
-    def __init__(self, **kwargs):
-        if 'lc' in kwargs:
-            # can take a LightCurve object as input
-            super().__init__(kwargs['lc'].time, kwargs['lc'].mag, kwargs['lc'].err)
-            self.lc = kwargs['lc']
-        elif all(key in kwargs for key in ['time', 'mag', 'err']):
-            # otherwise, can take time, mag and err arrays as input and define a LightCurve object
-            super().__init__(kwargs['time'], kwargs['mag'], kwargs['err'], kwargs.get('mask', None))
-            self.lc = LightCurve(self.time, self.mag, self.err)
-        else:
-            raise ValueError("Either a LightCurve object or time, mag and err arrays must be provided")  
+class TimeScale_refactored:
+    def __init__(self, lc, **kwargs):
+        if not isinstance(lc, LightCurve):
+            raise TypeError("lc must be an instance of LightCurve")
+        self.lc = lc
         # initialize attributes
         # minimum frequency resolved by the light-curve while guaranteeing at least two full cycle are covered
         self.min_freq =  kwargs.get('min_freq', 2. / (max(self.lc.time) - min(self.lc.time)))
@@ -70,7 +63,7 @@ class TimeScale_refactored(LightCurve):
 
 
 
-class TimeScale(LightCurve):
+class TimeScale:
     def __init__(self, lc, **kwargs):
         if not isinstance(lc, LightCurve):
             raise TypeError("lc must be an instance of LightCurve")
