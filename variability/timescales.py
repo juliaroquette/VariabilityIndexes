@@ -19,7 +19,8 @@ import matplotlib.pyplot as plt
 from variability.lightcurve import LightCurve
 from variability.structure_function import StructureFunction
 
-class TimeScale(LightCurve):
+
+class TimeScale_refactored(LightCurve):
     def __init__(self, **kwargs):
         if 'lc' in kwargs:
             # can take a LightCurve object as input
@@ -31,6 +32,59 @@ class TimeScale(LightCurve):
             self.lc = LightCurve(self.time, self.mag, self.err)
         else:
             raise ValueError("Either a LightCurve object or time, mag and err arrays must be provided")  
+        # initialize attributes
+        # minimum frequency resolved by the light-curve while guaranteeing at least two full cycle are covered
+        self.min_freq =  kwargs.get('min_freq', 2. / (max(self.lc.time) - min(self.lc.time)))
+        # time differences between consecutive epochs
+        self.dt = np.diff(np.sort(self.lc.time))
+        # some statistics on the time differences
+        self.median_dt = np.median(self.dt)
+        self.mean_dt = np.mean(self.dt)
+        self.geom_mean_dt = np.exp(np.mean(np.log(self.dt)))
+        self.min_dt = np.min(self.dt)
+        self.max_dt = np.max(self.dt)
+        # average time difference between the 5 smallest time differences
+        self.max_freq = kwargs.get('max_freq', 1./2./np.sort(self.dt)[:5].mean())
+
+    def get_GLS_periodogram(self, method='slow', samples_per_peak=5, normalization='standard'):
+        ls = LombScargle(self.time, self.mag, self.err, method=method, normalization=normalization)
+        frequency, power = ls.autopower(samples_per_peak=samples_per_peak,
+                                            minimum_frequency=self.min_freq,
+                                            maximum_frequency=self.max_freq, 
+                                            method=method) 
+        self.freq = frequency
+        self.power = power
+    
+    def get_n_highest_peaks(self, N=5):
+        self.get_GLS_periodogram()
+        # Find indices of peaks in the power array
+        freq_res = self.freq[1] - self.freq[0]
+        df = 1 / (max(self.lc.time) - min(self.lc.time))
+        peaks, _ = find_peaks(self.power, distance=int(5*freq_res/df))
+        # Get the powers at those indices and sort to get the top N
+        top_n_indices = peaks[np.argsort(self.power[peaks])[-N:]][::-1]
+        # Print the corresponding frequencies and powers
+        for i, idx in enumerate(top_n_indices):
+            vars(self)[f'gls_freq_{i + 1}'] = self.freq[idx]
+            vars(self)[f'gls_power_{i + 1}'] = self.power[idx]
+
+
+
+class TimeScale(LightCurve):
+    def __init__(self, lc, **kwargs):
+        if not isinstance(lc, LightCurve):
+            raise TypeError("lc must be an instance of LightCurve")
+        self.lc = lc
+        # if 'lc' in kwargs:
+        #     # can take a LightCurve object as input
+        #     super().__init__(kwargs['lc'].time, kwargs['lc'].mag, kwargs['lc'].err)
+        #     self.lc = kwargs['lc']
+        # elif all(key in kwargs for key in ['time', 'mag', 'err']):
+        #     # otherwise, can take time, mag and err arrays as input and define a LightCurve object
+        #     super().__init__(kwargs['time'], kwargs['mag'], kwargs['err'], kwargs.get('mask', None))
+        #     self.lc = LightCurve(self.time, self.mag, self.err)
+        # else:
+        #     raise ValueError("Either a LightCurve object or time, mag and err arrays must be provided")  
         # initialize attributes
         self.ts = np.nan
         self.method = None
@@ -72,9 +126,11 @@ class TimeScale(LightCurve):
         # then proceed to get timescale from SF
         if method == 'SF' or (method == 'auto' and (self.method is None)):
             try:
-                self.SF_ts, self.C0, self.C1 = self.get_structure_function_timescale()
-                self.method = 'SF'
-                self.ts = 1.*self.SF_ts
+                # self.SF_ts, self.C0, self.C1 = self.get_structure_function_timescale()
+                # self.method = 'SF'
+                # self.ts = 1.*self.SF_ts
+                print('Integrate new StructureFunction class')
+                pass
             except Exception as e:
                 warnings.warn(f"Structure Function failed: {e}")
                 
@@ -149,16 +205,26 @@ class TimeScale(LightCurve):
         Uses Chloé's implementation of the structure function to get a timescale
         """
         sf = StructureFunction(lc=self.lc)
-        sf.structure_function_slow()
-        sf.find_timescale()
+        # estimate SF values
+        sf.get_sf()
+        # Needs to pass desired parameters to the binning method
+        sf.bin_sf(sf_err=None,
+                       log=True,
+                       hybrid=False,
+                       bin_min_size=5, 
+                       max_bin_exp_factor=3.0, 
+                       step_size=0.2, 
+                       resolution=0.02)
+        # fit the structure function - needs to pass fitting parameters
+        sf.fit_sf(yerr=None, last_params=[1, 0.01, 0.1], # last fit parameters
+                    limits = [(0.07, 1800), (1e-6, 5), (1e-5, 100)], #
+                    log=True, cost_flavour='L2_error', reduced_chi2=True, input_cost=None)
+        (ts, ts_error), C0, C1, cost = sf.get_timescale()
         # print('SF timescale:', sf.ts)
-        return sf.ts, sf.C0, sf.C1
+        return ts, ts_error
     
-    # def get_MSE_timescale(self):
-    #     pass
+
     
-    # def get_CPD_timescale():
-    #     pass
 def pre_defined_parameters(time, definition='Gaia'):
     """
     Returns pre-defined parameters for the TimeScale class.
@@ -187,7 +253,7 @@ def pre_defined_parameters(time, definition='Gaia'):
     elif definition == 'auto':
         osf = 5
         # Guarantees at least one full period cycle is covered
-        min_freq = 2 / (max(time) - min(time)/2)
+        min_freq = 1 / (max(time) - min(time)/2)
         max_freq = 1./ 0.5 / (np.median(np.diff(time)))
     else:
         raise ValueError("Definition must be 'Gaia', 'auto', or 'Chloe'")        

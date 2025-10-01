@@ -31,6 +31,7 @@ __ Under implementation __
 - stetsonK
 
 __TO DO__
+- fix is_flux flag after it got removed from LightCurve
 - Add documenation to each method
 - Add references 
 - Add Saunders
@@ -47,13 +48,33 @@ from warnings import warn
 from variability.lightcurve import LightCurve, FoldedLightCurve
 
 
+class _tagged_property(property):
+    """A property that carries a marker for folded-only use.
+    This is used to decorate properties of VariabilityIndex that
+    should only exists when a FoldedLightCurve is used."""
+    def __init__(self, fget=None, *, folded_only=False, **kwargs):
+        super().__init__(fget, **kwargs)
+        self.folded_only = folded_only
+
+def folded_property(func):
+    """Decorator to mark a property as folded-only and return None
+    when not folded."""
+    def _f(self):
+        if not getattr(self, "_is_folded", False):
+            return None
+        return func(self)
+    return _tagged_property(_f, folded_only=True)
+
 class VariabilityIndex:
+    _suppress_warnings = False  # class variable to control warning suppression globally
     def __init__(self, lc, min_epochs=5, **kwargs):
         if not isinstance(lc, LightCurve):
             raise TypeError("lc must be an instance of LightCurve")
         self.lc = lc
+        self._is_folded = isinstance(lc, FoldedLightCurve)
         self._params = kwargs.copy()
-        self.min_epochs = min_epochs
+        self.min_epochs = int(min_epochs)
+        
 
     @property
     def std(self):
@@ -63,15 +84,14 @@ class VariabilityIndex:
         Returns:
             float: Standard deviation.
         """
-        if self.lc.n_epochs < self.min_epochs:
-            return None
-        else:
+        if self.lc.n_epochs >= self.min_epochs:
             return np.std(self.lc.mag,
                         # ddof=1 makes sure std is bias-corrects
                           # this means N-1 is used as the denominator rather than N
-                        ddof=1) 
+                        ddof=1)
+        else:
+            return None
 
- 
     @property
     def signal_to_noise(self):
         """
@@ -82,10 +102,10 @@ class VariabilityIndex:
         Returns:
             float: Signal-to-noise ratio.
         """
-        if self.lc.n_epochs < self.min_epochs:
-            return None
-        else:
+        if self.lc.n_epochs >= self.min_epochs:
             return self.std/self.lc.mean_err
+        else:
+            return None
 
     @property
     def shapiro_wilk(self):
@@ -94,9 +114,9 @@ class VariabilityIndex:
         else:
             return None
 
-    @property
+    @folded_property
     def periodicity_index(self):
-        if (self.lc.n_epochs > self.min_epochs) and isinstance(self.lc, FoldedLightCurve):
+        if (self.lc.n_epochs >= self.min_epochs):
             return PeriodicityIndex(parent=self).value
         else:
             # warn("Q-index is only available for folded light-curves")
@@ -312,12 +332,29 @@ class VariabilityIndex:
             warn("Not enough epochs to calculate the peak-to-peak amplitude for the given percentile")
             return None
 
+    
+
+    # def _list_properties(self):
+    #     """
+    #     list properties of the class LightCurve
+    #     """
+    #     property_names = [name for name, value in inspect.getmembers(self.__class__, lambda o: isinstance(o, property))]
+    #     return property_names    
+
     def _list_properties(self):
         """
-        list properties of the class LightCurve
+        This tests if the LightCurve is Folded and return 
+        the list of properties accordingly.
         """
-        property_names = [name for name, value in inspect.getmembers(self.__class__, lambda o: isinstance(o, property))]
-        return property_names    
+        props = []
+        is_folded = isinstance(self.lc, FoldedLightCurve)
+        for name, value in inspect.getmembers(self.__class__,
+                                              lambda o: isinstance(o, property)):
+            # Skip folded-only properties if lc is not folded
+            if isinstance(value, _tagged_property) and value.folded_only and not is_folded:
+                continue
+            props.append(name)
+        return props
         
     def __str__(self):
         return f'A VariabilityIndex instance has the following properties: {repr(self._list_properties())}'
@@ -384,6 +421,10 @@ class PeriodicityIndex:
         # self.parent.lc._get_waveform()
         return (np.std(self.parent.lc.residual, ddof=1)**2 - np.mean(self.parent.lc.err_phased)**2)\
             /(np.std(self.parent.lc.mag_phased, ddof=1)**2 - np.mean(self.parent.lc.err_phased)**2)
+
+
+
+
 
 def gaia_AG_proxy(phot_g_mean_flux, phot_g_mean_flux_error, phot_g_n_obs):
     """
