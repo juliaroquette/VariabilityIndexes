@@ -200,7 +200,7 @@ from variability.indexes import VariabilityIndex
 var = VariabilityIndex(lc_p, timescale=period, min_epochs=5)
 ```
 
-you are expected to pass in a `LightCurve` object, or a `FoldedLightCurve` object. However,  **note that** some variability indexes, like the Q-index itself, require either a `timescale` argument or a `FoldedLightCurve` instance (which already have an instance `timescale`). `VariabilityIndex` requires a policy for minimum number of epochs in the light curve for properties derived from statistics with the light curve to be calculated, default to `min_epochs=5`. 
+you are expected to pass in a `LightCurve` object, or a `FoldedLightCurve` object. **Note that** some variability indexes, like the Q-index itself, require either a `timescale` argument or a `FoldedLightCurve` instance (which already have an instance `timescale`). `VariabilityIndex` requires a policy for minimum number of epochs in the light curve for properties derived from statistics with the light curve to be calculated, default to `min_epochs=5`. 
 
 The list of implemented variability indexes currently implemented can be accessed with:
 
@@ -590,7 +590,7 @@ residuals = wf.residual_magnitude(waveform)
 from variability.timescale import  TimeScale
 ```
 
-The `TimeScale` class allows to quick estimation of variability light curves for either a trio of (`time, mag, err`) or an object `LightCurve`. There are two types of timescale estimator currently implemented:
+The `TimeScale` class allows to quick estimation of variability light curves for an object `LightCurve` defined from a trio (`time, mag, err`). There are two types of timescale estimator currently implemented:
 
 - Periodic Timescale:
 - Aperiodic timescale: 
