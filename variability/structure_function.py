@@ -11,24 +11,30 @@ import pandas as pd
 from iminuit import Minuit
 from variability.lightcurve import LightCurve
 
-class StructureFunction(LightCurve):
+class StructureFunction:
     """
     Class to compute structure functions from time series data.
     It provides methods to compute the structure function, fit it,
     and adaptively bin the results.
     """
-    
-    def __init__(self, **kwargs):
-        if 'lc' in kwargs:
-            # can take a LightCurve object as input
-            super().__init__(kwargs['lc'].time, kwargs['lc'].mag, kwargs['lc'].err)
-            self.lc = kwargs['lc']
-        elif all(key in kwargs for key in ['time', 'mag', 'err']):
+
+    def __init__(self, lc, **kwargs):
+        if not isinstance(lc, LightCurve):
+            raise TypeError("lc must be an instance of LightCurve")
+        self.lc = lc
+        # if 'lc' in kwargs:
+        #     # can take a LightCurve object as input
+        #     super().__init__(kwargs['lc'].time, kwargs['lc'].mag, kwargs['lc'].err)
+        #     self.lc = kwargs['lc']
+        # elif all(key in kwargs for key in ['time', 'mag', 'err']):
             # otherwise, can take time, mag and err arrays as input and define a LightCurve object
-            super().__init__(kwargs['time'], kwargs['mag'], kwargs['err'], kwargs.get('mask', None))
-            self.lc = LightCurve(self.time, self.mag, self.err)
-        else:
-            raise ValueError("Either a LightCurve object or time, mag and err arrays must be provided")
+            # super().__init__(kwargs['time'], kwargs['mag'], kwargs['err'], kwargs.get('mask', None))
+            # self.lc = LightCurve(self.time, self.mag, self.err)
+        # else:
+            # raise ValueError("Either a LightCurve object or time, mag and err arrays must be provided")
+        self.y_fit = None
+        self.params = None
+        self.fit_errors = None
         
     def get_sf(self):
         """
@@ -45,22 +51,21 @@ class StructureFunction(LightCurve):
         Uses adaptative_binning to bin the structure function data.
         The output is stored in the class attributes sf_binned, time_bins, sf_bin_err, pair_counts and irregular_bin.
         """
-
-        sf_err = kwargs.get('sf_err', None)
+        assert hasattr(self, 'time_lag'), "Please run get_sf() before binning the structure function."
+        sf_err = kwargs.get('sf_err',  None)
         log = kwargs.get('log', True)
         hybrid = kwargs.get('hybrid', False)
         bin_min_size = kwargs.get('bin_min_size', 5)
         max_bin_exp_factor = kwargs.get('max_bin_exp_factor', 3.0)
         resolution = kwargs.get('resolution', 0.02)
         step_size = kwargs.get('step_size', 0.2)
-        self.sf_binned, self.time_bins, self.sf_bin_err, self.pair_counts, self.irregular_bin = adaptative_binning(self.time_lag, self.sf_vals, sf_err=sf_err,
+        self.time_bins, self.sf_binned, self.sf_bin_err, self.pair_counts, self.irregular_bin = adaptative_binning(self.time_lag, self.sf_vals, sf_err=sf_err,
                        log=log,
                        hybrid=hybrid,
                        bin_min_size=bin_min_size,
                        max_bin_exp_factor=max_bin_exp_factor,
                        resolution=resolution,
                        step_size=step_size)
-            
     
     def fit_sf(self, **kwargs):
         """
@@ -73,25 +78,33 @@ class StructureFunction(LightCurve):
         - `cost_flavour='L2_error'` 
         - `reduced_chi2=True`
         """
-        model = kwargs.get('model', "L2_error")
+        assert hasattr(self, 'sf_binned'), "Please run bin_sf() before fitting the structure function."
         log = kwargs.get('log', True)
         reduced_chi2 = kwargs.get('reduced_chi2', True)
         cost_flavour = kwargs.get('cost_flavour', 'L2_error')
         yerr = kwargs.get('yerr', self.sf_bin_err)
-        # best model fit
-        self.y_fit, \
-        # best model params t0_fit, C0_fit, C1_fit
-        self.params, \
-        # errors on the best fit params
-        self.fit_errors, \
-        # cost minimum,
-        self.cost_min = self.fit_structure_function(self.time_bins, 
+        last_params = kwargs.get('last_params', [8.0, 0.001, 10.])
+        input_cost = kwargs.get('input_cost', None)
+        limits = kwargs.get('limits', [(0.4, 2500.0),(1e-9, 1e-1),(1e-5, 100.0)])
+        # # best model fit
+        # self.y_fit,\
+        # # best model params t0_fit, C0_fit, C1_fit
+        # self.params, \
+        # # errors on the best fit params
+        # self.fit_errors, \
+        # # cost minimum,
+        # self.cost_min 
+        
+        self.y_fit, self.params, self.fit_errors, self.cost_min = fit_with_minuit(self.time_bins, 
                                                   self.sf_binned, 
                                                   yerr=yerr, 
-                                                  model=model, 
+                                                  last_params=last_params,
                                                   log=log, 
-                                                  cost_flavour=cost_flavour, 
-                                                  reduced_chi2=reduced_chi2)
+                                                  cost_flavour=cost_flavour,
+                                                  reduced_chi2=reduced_chi2,
+                                                  input_cost=input_cost,
+                                                  limits=limits
+                                                  )
     def get_timescale(self, C0C1_min=None, 
                         C0_error_min=None, 
                         C1_error_min=None, 
@@ -105,6 +118,7 @@ class StructureFunction(LightCurve):
         
         Uses the fitted parameters from fit_sf() to compute the timescale.
         Returns the timescale t0_fit, C0_fit, C1_fit and their errors.
+        TO DO: return some quality info about the fit.
         """
         if evaluate_timescale(self.params, 
                                   self.fit_errors, 
@@ -117,16 +131,11 @@ class StructureFunction(LightCurve):
                                   C0_range=C0_range,
                                   C1_range=C1_range,
                                   t0_range=t0_range):
-            self.sf_timescale = self.params[0]  # t0_fit
-            self.sf_C0 = self.params[1]
-            self.sf_C1 = self.params[2]
-            self.timescale_error = self.fit_errors[0]  # t0_err
+            # returns timescale, c0, c1 and timescale uncertainty
+            return (self.params[0], self.fit_errors[0]), self.params[1], self.params[2], self.cost_min
         else:
             print("Structure function fit did not pass the validation criteria.")
-            self.sf_timescale = None
-            self.sf_C0 = None
-            self.sf_C1 = None
-            self.timescale_error = None
+            return (None, None), None, None, None
             
     
 def evaluate_timescale(params, fit_errors, cost_min,
@@ -143,35 +152,36 @@ def evaluate_timescale(params, fit_errors, cost_min,
     
     Uses the fitted parameters from fit_sf() to compute the timescale.
     Returns the timescale t0_fit, C0_fit, C1_fit and their errors.
+    This is needed to access the fitted parameters' errors inside VariPipe (these are not exported)
     """
     
     t0_fit, C0_fit, C1_fit = params
     t0_err, C0_err, C1_err = fit_errors
     
     validate = True
-    if C0C1_min:
+    if C0C1_min is not None:
         # test if C1 is at least 
         if (C1_fit/ C0_fit < C0C1_min):
             validate = False
-    if C0_error_min:
+    if C0_error_min is not None:
         if (C0_fit/ C0_err  < C0_error_min):
             validate = False
-    if C1_error_min:
+    if C1_error_min is not None:
         if (C1_fit / C1_err  < C1_error_min):
             validate = False
-    if t0_error_min:
+    if t0_error_min is not None:
         if (t0_fit / t0_err < t0_error_min):
             validate = False
-    if cost_min_range:
+    if cost_min_range is not None:
         if (cost_min < cost_min_range[0]) or (cost_min > cost_min_range[1]):
             validate = False
-    if C0_range:
+    if C0_range is not None:
         if (C0_fit < C0_range[0]) or (C0_fit > C0_range[1]):
             validate = False
-    if C1_range:
+    if C1_range is not None:
         if (C1_fit < C1_range[0]) or (C1_fit > C1_range[1]):
             validate = False
-    if t0_range:
+    if t0_range is not None:
         if (t0_fit < t0_range[0]) or (t0_fit > t0_range[1]):
             validate = False
     return validate
@@ -414,6 +424,35 @@ def model_function(x, t0, C0, C1):
     Model function for the structure function.
     """
     return C1 * (1 - np.exp(-(x / t0))) + C0
+
+def fit_with_minuit(time_bins, sf, 
+                    yerr=None, 
+                    last_params=[1.0, 0.1, 0.1], # last fit parameters
+                    limits = [(0.07, 1800), (1e-6, 5), (1e-5, 100)], #
+                    log=True, cost_flavour='L2', input_cost=None, reduced_chi2=False):
+    
+    # Define a wrapped function for Minuit that only takes the parameters to be optimized
+    def cost_function_for_minuit(t0, C0, C1):
+        return cost_function(time_bins, sf, t0, C0, C1, yerr=yerr, log=log, cost_flavour=cost_flavour, input_cost=input_cost, reduced_chi2=reduced_chi2)
+    # Initialize Minuit
+    m = Minuit(cost_function_for_minuit, t0=last_params[0], C0=last_params[1], C1=last_params[2])
+
+    m.errordef = 1  # For anything including  squared difference between data and model. 
+    # this should also work for the L1 cost function, but needs to be changed for log-likehood
+    m.limits = limits
+            
+    # Perform the minimization
+    m.migrad()
+
+    # Extract the fit results
+    t0_fit, C0_fit, C1_fit = m.values
+    # fit_errors = m.errors # the 1sigma errors on the fit parameters
+    fit_errors = (m.errors["t0"], m.errors["C0"], m.errors["C1"]) 
+    cost_min   = m.fval  # Get the minimum chi-squared value
+    y_fit      = model_function(time_bins, t0_fit, C0_fit, C1_fit)
+    # print(m.tol)
+    # y_fit = y_fit[np.argsort(time_bins)]  # Ensure y_fit is sorted according to time_bins
+    return y_fit, (t0_fit, C0_fit, C1_fit), fit_errors, cost_min
 
 def cost_function(x, y, t0, C0, C1, 
                   yerr=None, 
