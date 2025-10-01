@@ -46,7 +46,22 @@ import numpy as np
 import scipy.stats as ss
 from warnings import warn
 from variability.lightcurve import LightCurve, FoldedLightCurve
+import functools
 
+import functools
+
+def min_epochs_property(func):
+    """    Decorator defined to enforce the minimum number of epochs globally
+    It returns None if lc.n_epochs < self.min_epochs; 
+    else run the function.
+    returned values are properties
+    """
+    @functools.wraps(func)
+    def wrapped(self, *args, **kwargs):
+        if getattr(self.lc, "n_epochs", 0) < self.min_epochs:
+            return None
+        return func(self, *args, **kwargs)
+    return property(wrapped)
 
 class _tagged_property(property):
     """A property that carries a marker for folded-only use.
@@ -74,9 +89,8 @@ class VariabilityIndex:
         self._is_folded = isinstance(lc, FoldedLightCurve)
         self._params = kwargs.copy()
         self.min_epochs = int(min_epochs)
-        
 
-    @property
+    @min_epochs_property
     def std(self):
         """
         Returns the standard deviation of the magnitude values.
@@ -84,15 +98,12 @@ class VariabilityIndex:
         Returns:
             float: Standard deviation.
         """
-        if self.lc.n_epochs >= self.min_epochs:
-            return np.std(self.lc.mag,
-                        # ddof=1 makes sure std is bias-corrects
-                          # this means N-1 is used as the denominator rather than N
-                        ddof=1)
-        else:
-            return None
+        return np.std(self.lc.mag,
+                    # ddof=1 makes sure std is bias-corrects
+                        # this means N-1 is used as the denominator rather than N
+                    ddof=1)
 
-    @property
+    @min_epochs_property
     def signal_to_noise(self):
         """
         Returns the signal-to-noise ratio of the light curve
@@ -102,17 +113,11 @@ class VariabilityIndex:
         Returns:
             float: Signal-to-noise ratio.
         """
-        if self.lc.n_epochs >= self.min_epochs:
-            return self.std/self.lc.mean_err
-        else:
-            return None
+        return self.std/self.lc.mean_err
 
-    @property
+    @min_epochs_property
     def shapiro_wilk(self):
-        if self.lc.n_epochs > self.min_epochs:
-            return ss.shapiro(self.lc.mag)[0]
-        else:
-            return None
+        return ss.shapiro(self.lc.mag)[0]
 
     @folded_property
     def periodicity_index(self):
@@ -122,15 +127,12 @@ class VariabilityIndex:
             # warn("Q-index is only available for folded light-curves")
             return None
 
-    @property
+    @min_epochs_property
     def asymmetry_index(self):
         # calculate M-index
         M_percentile = self._params.get('M_percentile', 10.)
         M_is_flux = self._params.get('M_is_flux', False)
-        if self.lc.n_epochs > self.min_epochs:
-            return AsymmetryIndex(parent=self,percentile=M_percentile, is_flux=M_is_flux).value
-        else:
-            return None
+        return AsymmetryIndex(parent=self,percentile=M_percentile, is_flux=M_is_flux).value
 
     # @property    
     def Abbe(self):
@@ -157,73 +159,50 @@ class VariabilityIndex:
     #     return np.sum(np.fabs(residual)
     #                   )/np.sqrt(self.lc.n_epochs*np.sum(residual**2))
 
-    @property
-    def shapiro_wilk(self):
-        if self.lc.n_epochs > self.min_epochs:
-            return ss.shapiro(self.lc.mag)[0]
-        else:
-            return None
 
-    @property
+    @min_epochs_property
     def mad(self):
         """
         median absolute deviation
         """
-        if self.lc.n_epochs < self.min_epochs:
-            return None
-        else:
-            return ss.median_abs_deviation(self.lc.mag, nan_policy='omit')
+        return ss.median_abs_deviation(self.lc.mag, nan_policy='omit')
 
-    @property
+    @min_epochs_property
     def chi_square(self):
         """
         Raw Chi-square value
         """
-        if self.lc.n_epochs < self.min_epochs:
-            return None
-        else:
-            return np.sum((self.lc.mag - self.lc.weighted_average)**2 / self.lc.err**2)
+        return np.sum((self.lc.mag - self.lc.weighted_average)**2 / self.lc.err**2)
 
-    @property
+    @min_epochs_property
     def reduced_chi_square(self):
         """
         Reduced Chi-square value:
         raw chi-square divided by the number of degrees of freedom (N-1)
         """
-        if self.lc.n_epochs < self.min_epochs:
-            return None
-        else:
-            return self.chi_square/(np.count_nonzero(
+        return self.chi_square/(np.count_nonzero(
                            ~np.isnan(self.lc.mag)) - 1)
     
-    @property
+    @min_epochs_property
     def iqr(self):
         """
         inter-quartile range
         """
-        if self.lc.n_epochs < self.min_epochs:
-            return None
-        else:
-            return ss.iqr(self.lc.mag)
+        return ss.iqr(self.lc.mag)
     
-    @property
+    @min_epochs_property
     def roms(self):
         """
         Robust-Median Statistics (RoMS)
         """
-        if self.lc.n_epochs > self.min_epochs:
-            return np.sum(np.abs(self.lc.mag - np.median(self.lc.mag))/self.lc.err)/(self.lc.n_epochs- 1)
-        else:
-            return None
+        return np.sum(np.abs(self.lc.mag - np.median(self.lc.mag))/self.lc.err)/(self.lc.n_epochs- 1)
 
-    @property
+
+    @min_epochs_property
     def normalised_excess_variance(self):
-        if self.lc.n_epochs > self.min_epochs:
-            return (self.lc.std**2 - self.lc.mean_err**2)/self.lc.mean**2
-        else:
-            return None
+        return (self.std**2 - self.lc.mean_err**2)/self.lc.mean**2
 
-    @property
+    @min_epochs_property
     def lag1_auto_corr(self):
         if self.lc.n_epochs < self.min_epochs:
             return None
@@ -233,37 +212,25 @@ class VariabilityIndex:
                           (self.lc.mag - self.lc.mean)**2)
     
 
-    @property
+    @min_epochs_property
     def norm_ptp(self):
-        if self.lc.n_epochs < self.min_epochs:
-            return None
-        else:
-            return (max(self.lc.mag - self.lc.err) - 
-                min(self.lc.mag + self.lc.err))/(max(self.lc.mag - self.lc.err) 
-                                           + min(self.lc.mag + self.lc.err))    
+        return (max(self.lc.mag - self.lc.err) - 
+            min(self.lc.mag + self.lc.err))/(max(self.lc.mag - self.lc.err) 
+                                        + min(self.lc.mag + self.lc.err))    
 
-    @property
+    @min_epochs_property
     def anderson_darling(self):
-        if self.lc.n_epochs < self.min_epochs:
-            return None
-        else:
-            return ss.anderson(self.lc.mag)[0]
+        return ss.anderson(self.lc.mag)[0]
 
-    @property
+    @min_epochs_property
     def skewness(self):
-        if self.lc.n_epochs < self.min_epochs:
-            return None
-        else:
-            return ss.skew(self.lc.mag, nan_policy='omit')
+        return ss.skew(self.lc.mag, nan_policy='omit')
 
-    @property
+    @min_epochs_property
     def kurtosis(self):
-        if self.lc.n_epochs < self.min_epochs:
-            return None
-        else:
-            return ss.kurtosis(self.lc.mag)
+        return ss.kurtosis(self.lc.mag)
 
-    @property
+    @min_epochs_property
     def ptp_5(self):
         """
         Returns the peak-to-peak amplitude of the magnitude values.
@@ -273,12 +240,9 @@ class VariabilityIndex:
         Returns:
             float: Peak-to-peak amplitude.
         """
-        if self.lc.n_epochs < self.min_epochs:
-            return None
-        else:
-            return  self.ptp_perc(percentile=5.)
+        return  self.ptp_perc(percentile=5.)
 
-    @property
+    @min_epochs_property
     def ptp_10(self):
         """
         Returns the peak-to-peak amplitude of the magnitude values.
@@ -288,12 +252,9 @@ class VariabilityIndex:
         Returns:
             float: Peak-to-peak amplitude.
         """
-        if self.lc.n_epochs < self.min_epochs:
-            return None
-        else:
-            return  self.ptp_perc(percentile=10.)
+        return  self.ptp_perc(percentile=10.)
 
-    @property
+    @min_epochs_property
     def ptp_20(self):
         """
         Returns the peak-to-peak amplitude of the magnitude values.
@@ -303,10 +264,7 @@ class VariabilityIndex:
         Returns:
             float: Peak-to-peak amplitude.
         """
-        if self.lc.n_epochs < self.min_epochs:
-            return None
-        else:
-            return  self.ptp_perc(percentile=20.)
+        return self.ptp_perc(percentile=20.)
 
     def ptp_perc(self, percentile=10.):
         """
@@ -322,7 +280,8 @@ class VariabilityIndex:
         """
         if (percentile <= 0.) or (percentile >= 49.):
             raise ValueError("Please enter a valid percentile (between 0. and 49.)")
-        if self.lc.n_epochs < self.min_epochs:
+        # it can't get a tail if there are not enough epochs
+        if self.lc.n_epochs < 3:
             return None
         tail = int(np.floor(percentile * self.lc.n_epochs / 100.))
         if tail > 1:
@@ -409,7 +368,7 @@ class AsymmetryIndex:
                             
     @property
     def value(self):
-        return (1. - 2*int(self.is_flux))*(np.mean(self.parent.lc.mag[self.get_percentile_mask]) - self.parent.lc.median)/self.parent.lc.std
+        return (1. - 2*int(self.is_flux))*(np.mean(self.parent.lc.mag[self.get_percentile_mask]) - self.parent.lc.median)/self.parent.std
 
 class PeriodicityIndex:
     def __init__(self, parent):
