@@ -49,7 +49,7 @@ class LightCurve:
         - time_min (float): Minimum value of the observation times.
         - ptp (float): range of magnitude values (peak-to-peak amplitude).
     """
-    def __new__(cls, time, mag, err):
+    def __new__(cls, *, time, mag, err):
         """
         Tests if the minimum requirements to create a LightCurve object are met.
         """
@@ -64,10 +64,7 @@ class LightCurve:
         # otherwise proceed with normal instance creation
         return super().__new__(cls)
 
-    def __init__(self,
-                 time,
-                 mag,
-                 err):
+    def __init__(self, *, time, mag, err):
         """
         Initializes a LightCurve object.
 
@@ -221,6 +218,10 @@ class LightCurve:
         
     def __str__(self):
         return f'A LightCurve instance has the following properties: {repr(self._list_properties())}'
+    
+    def __len__(self):
+        return self.n_epochs
+
 
 class FoldedLightCurve(LightCurve):
     """
@@ -228,21 +229,34 @@ class FoldedLightCurve(LightCurve):
     """
     # Control for warnings
     _suppress_warnings = False
-    def __init__(self,
-                 timescale=None,
-                 **kwargs):
-        
-        # makes sure this is also a LightCurve object
+    def __new__(cls, **kwargs):
         if 'lc' in kwargs:
-            lc = kwargs['lc']
-            if not isinstance(lc, LightCurve):
+            if not isinstance(kwargs['lc'], LightCurve):
                 raise TypeError("'lc' must be a LightCurve instance")
-            else:
-                super().__init__(lc.time, lc.mag, lc.err)
+            if all(key in kwargs for key in ['time', 'mag', 'err']):
+                warnings.warn("Both 'lc' and 'time', 'mag', 'err' were, 'lc' will be used", UserWarning)
+            return super().__new__(cls, time=kwargs['lc'].time, mag=kwargs['lc'].mag, err=kwargs['lc'].err)
+        # otherwise, test is time, mag, err needed to build LightCurve were passed
         elif all(key in kwargs for key in ['time', 'mag', 'err']):
-            super().__init__(kwargs['time'], kwargs['mag'], kwargs['err'])
+            return super().__new__(cls, time=kwargs['time'], mag=kwargs['mag'], err=kwargs['err'])
+        else:
+            raise ValueError("Either a lc=LightCurve object or time, mag and err arrays must be provided")
+
+    def __init__(self, *,
+                 timescale,
+                 **kwargs):
+        if 'lc' in kwargs:
+            # this guarantees that the time, mag, err is the same in both
+            # the current and the parent object. This is, with lc=LightCurve(...)
+            # and lc_f = FoldedLightCurve(lc=lc), lc_f.time is lc.time, and so on
+            self.time = kwargs['lc'].time
+            self.mag  = kwargs['lc'].mag
+            self.err  = kwargs['lc'].err
+        elif all(key in kwargs for key in ['time', 'mag', 'err']):
+            super().__init__(time=kwargs['time'], mag=kwargs['mag'], err=kwargs['err'])
         else:
             raise ValueError("Either a LightCurve object or time, mag and err arrays must be provided")
+
         # FoldedLightCurve needs a timescale
         if (not isinstance(timescale, (int, float))) or (timescale <= 0.):
             raise ValueError("FoldedLightCurve object requires a timescale (positive float/int value) to be defined.")
@@ -393,8 +407,6 @@ class FoldedLightCurve(LightCurve):
                 f"waveform_type={self._waveform_type}, "
                 f"N={self.n_epochs})>")
 
-    def __len__(self):
-        return self.n_epochs
 
 class SyntheticLightCurve:
     """
