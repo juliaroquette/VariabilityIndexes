@@ -98,7 +98,7 @@ class TimeScale:
         #
         fap_prob = kwargs.get('fap_prob', 0.01)
         definition = kwargs.get('definition', 'auto')
-        osf, min_freq, max_freq = pre_defined_parameters(self.time, definition=definition)
+        osf, min_freq, max_freq = pre_defined_parameters(self.lc.time, definition=definition)
         # if methods set to lomb scargle or to auto, first try to get 
         # timescales using the Lomb-Scargle periodogram
         if method in ['LSP', 'auto']:
@@ -163,7 +163,7 @@ class TimeScale:
             FAP_highest_peak: 0-1. float: False Alarm Probability for the highest peak
         """
         # define the base for the Lomb-Scargle
-        ls = LombScargle(self.time, self.mag, self.err)
+        ls = LombScargle(self.lc.time, self.lc.mag, self.lc.err)
         if definition == 'Chloe':
             frequency = np.arange(fmin, fmax, step=0.0002)
             power = ls.power(frequency, method='slow')
