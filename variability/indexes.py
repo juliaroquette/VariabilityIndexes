@@ -48,10 +48,9 @@ from warnings import warn
 from variability.lightcurve import LightCurve, FoldedLightCurve
 import functools
 
-import functools
-
 def min_epochs_property(func):
-    """    Decorator defined to enforce the minimum number of epochs globally
+    """
+    Decorator defined to enforce the minimum number of epochs globally
     It returns None if lc.n_epochs < self.min_epochs; 
     else run the function.
     returned values are properties
@@ -64,7 +63,8 @@ def min_epochs_property(func):
     return property(wrapped)
 
 class _tagged_property(property):
-    """A property that carries a marker for folded-only use.
+    """
+    A property that carries a marker for folded-only use.
     This is used to decorate properties of VariabilityIndex that
     should only exists when a FoldedLightCurve is used."""
     def __init__(self, fget=None, *, folded_only=False, **kwargs):
@@ -72,12 +72,20 @@ class _tagged_property(property):
         self.folded_only = folded_only
 
 def folded_property(func):
-    """Decorator to mark a property as folded-only and return None
-    when not folded."""
-    def _f(self):
+    """
+    Decorator for the FoldedLightCurve VariabilityIndexes:
+    returns None unless lc is folded
+    while also enforcing n_epochs >= min_epochs.
+    """
+    @functools.wraps(func)
+    def _f(self, *args, **kwargs):
+        # global min-epochs policy
+        if getattr(self.lc, "n_epochs", 0) < self.min_epochs:
+            return None
+        # folded-only policy
         if not getattr(self, "_is_folded", False):
             return None
-        return func(self)
+        return func(self, *args, **kwargs)
     return _tagged_property(_f, folded_only=True)
 
 class VariabilityIndex:
@@ -104,6 +112,18 @@ class VariabilityIndex:
                     ddof=1)
 
     @min_epochs_property
+    def weighted_average(self):
+        """
+        Returns the weighted average of the magnitude values.
+
+        Returns:
+            float: Weighted average.
+        """
+        # this avoids division by zero:
+        weights = np.clip(1./(self.lc.err**2), 1e-12, None)
+        return np.average(self.lc.mag, weights=weights)
+
+    @min_epochs_property
     def signal_to_noise(self):
         """
         Returns the signal-to-noise ratio of the light curve
@@ -121,11 +141,7 @@ class VariabilityIndex:
 
     @folded_property
     def periodicity_index(self):
-        if (self.lc.n_epochs >= self.min_epochs):
-            return PeriodicityIndex(parent=self).value
-        else:
-            # warn("Q-index is only available for folded light-curves")
-            return None
+        return PeriodicityIndex(parent=self).value
 
     @min_epochs_property
     def asymmetry_index(self):
@@ -291,15 +307,36 @@ class VariabilityIndex:
             warn("Not enough epochs to calculate the peak-to-peak amplitude for the given percentile")
             return None
 
+    @folded_property
+    def residual_mean(self):
+        """
+        Average of the residuals of the folded light-curve
+        """
+        return np.mean(self.lc.residual)
     
-
-    # def _list_properties(self):
-    #     """
-    #     list properties of the class LightCurve
-    #     """
-    #     property_names = [name for name, value in inspect.getmembers(self.__class__, lambda o: isinstance(o, property))]
-    #     return property_names    
-
+    @folded_property
+    def residual_std(self):
+        """
+        Standard deviation of the residuals of the folded light-curve
+        """
+        return np.std(self.lc.residual, ddof=1)
+    
+    @folded_property
+    def lafler_kinman(self):
+        """
+        Lafler-Kinman string length index of the folded light-curve
+        """
+        return np.sum((self.lc.mag_phased[1:] - self.lc.mag_phased[:-1])**2) / np.sum(
+            (self.lc.mag_phased - self.lc.mean)**2)
+    
+    @folded_property
+    def string_length(self):
+        """
+        String length index of the folded light-curve
+        """
+        return np.sum(np.sqrt(np.diff(self.lc.mag_phased)**2 + np.diff(self.lc.phase)**2))
+    
+    
     def _list_properties(self):
         """
         This tests if the LightCurve is Folded and return 
