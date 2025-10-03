@@ -177,32 +177,20 @@ class LightCurve:
         return np.median(self.mag)
     
     @property
-    def ptp(self):
+    def range(self):
         """
         Returns the (range) peak-to-peak amplitude of the magnitude values.
         This follows a simple definition of peak-to-peak amplitude as the difference between the maximum and minimum values.
 
         Returns:
-            float: Peak-to-peak amplitude.
+            float: (range) peak-to-peak amplitude.
         """
-        # ptp can only be zero if all values are the same        
-        ptp = np.max(self.mag) - np.min(self.mag)
+        # range can only be zero if all values are the same        
+        range = np.max(self.mag) - np.min(self.mag)
         if len(self.mag) > 1:
-            return ptp
+            return range
         else:
             return None
-
-    @property
-    def weighted_average(self):
-        """
-        Returns the weighted average of the magnitude values.
-
-        Returns:
-            float: Weighted average.
-        """
-        # this avoids division by zero:
-        weights = np.clip(1./(self.err**2), 1e-12, None)
-        return np.average(self.mag, weights=weights)
 
     def get_timescale_properties(self):
         # get the difference between consecutive time values
@@ -310,7 +298,11 @@ class FoldedLightCurve(LightCurve):
         self._reference_time = new_reference_time
         self._get_phased_values()
         self._get_waveform()
-        
+    
+    @property
+    def n_cycle(self):
+        return np.nanmax(self.phase_number)
+    
     @property
     def waveform_type(self):
         return self._waveform_type    
