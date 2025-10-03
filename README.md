@@ -26,11 +26,11 @@ Provides tools for loading light curves as objects. Three distinct classes relat
 - `SyntheticLightCurve` (under construction) provide a suite of models of light curves for different variability modes and survey fingerprints. 
 - `MultiBandLighCurve`  (not implemented yet) deals with (quasi-)simultaneous multiband light curves.
 
-Throughout this documentation, we approach an observed light-curve as:
+Throughout this documentation, we approach an observed light-curve as a series of observations, $\{m_i\}$, where:
 
-$$x_i = x(t_i) + a(t_i) + \epsilon_{i},$$
+$$m_i = m(t_i) + a(t_i) + \epsilon_{i},$$
 
-where $x_i$ is the $i$-th observation at the time $t_i$, $\{x(t_i)\}$ are snapshots of a time-dependent signal at the time $t_i$ (or the primary signal in the light-curve),  $\{a(t_i)\}$ is any secondary signal,  $\epsilon_{i}$ is the photometric uncertainty for the $i$-th observation.
+where $m_i$ is the $i$-th observation at the time $t_i$, $\{m(t_i)\}$ are a series of snapshots of a time-dependent signal at the time $t_i$ (or the primary signal in the light-curve).  $\{a(t_i)\}$ is any secondary signal, which is often assume to be zero. $\epsilon_{i}$ is the photometric uncertainty for the $i$-th observation, which in an ideal case is not too far from the survey's typical uncertainty, $\bar{\epsilon}$.
 
 For example, let's consider the following light-curve:
 
@@ -44,9 +44,11 @@ amplitude = 0.5
 noise =  np.random.normal(scale=0.05, size=N)
 mag_sin = 0.5 * amplitude * np.sin(2 * np.pi * time / period) + noise
 ````
-**Note:** it is important to note that astronomical magnitudes are obtained from the observed flux of stars. For the fluxes, it is common to assume that errors are Gaussian distributed, which is ok for bright sources (but not always true!). However, when converting fluxes to magnitudes, $x_i=-2.5\log\big(\frac{f_i}{f_0}\big)$, uncertainty propagation yield asymmetric uncertainties. It is a common assumption that error are symmetric even in magnitude, with the argument that that for small errors in flux, a log function will be approximately linear. This note must be kept in mind for both when simulating light curves, but also when working with variability indexes that assume a specific behavior for the case of constant stars dominated by gaussian noise. 
+**Note:** it is important to note that astronomical magnitudes are obtained from the observed flux of stars. For the fluxes, it is common to assume that errors are Gaussian distributed, which is ok for bright sources (but not always true!). However, when converting fluxes to magnitudes, $m_i=-2.5\log\big(\frac{f_i}{f_0}\big)$, uncertainty propagation yield asymmetric uncertainties. It is a common assumption that error are symmetric even in magnitude, with the argument that that for small errors in flux, a log function will be approximately linear. This note must be kept in mind for both when simulating light curves, but also when working with variability indexes that assume a specific behavior for the case of constant stars dominated by gaussian noise. 
 
 ## `LightCurve` class
+
+ `LightCurve` is a class that formats input time-series data, $\{t_i, m_i, \epsilon_i\}$, into a standard representation. 
 
 To instantiate a `LightCurve` object:
 
@@ -57,45 +59,40 @@ To instantiate a `LightCurve` object:
 
 Where the attributes `time`, `mag`, and `err` are numpy-arrays with the same length providing the observational time, magnitudes and magnitude uncertainties respectively. 
 
-`LightCurve` objects have a series of properties. To see the list of properties currently implemented, use:
+Additionally to the time-series itself, `LightCurve` objects have a series of descriptive properties attached to itself. The list of properties currently implemented, can be accessed using:
 
-``lc._list_properties()``
-
+```python
+lc._list_properties()
+```
 
 - `n_epochs` : Number of datapoints (number of epochs), $N$, in the light curve.
 
 
 - `mean` : simple average of the magnitudes.
 
-$$\bar{x} = \frac{1}{N} \sum_{i=1}^{N} x_i$$
+$$\bar{m} = \frac{1}{N} \sum_{i=1}^{N} m_i$$
 
-- `mean_err`:  average uncertainty in magnitudes (or typical uncertainty)
+- `mean_err`:  average uncertainty in magnitudes (namely typical survey uncertainty)
 
 $$\bar{\epsilon} = \frac{1}{N} \sum_{i=1}^{N} \epsilon_i$$
 
 
-- `weighted_average`: Weighted average of the magnitude values.
-
-$$\bar{x}_w = \frac{\sum_{i=1}^{N} w_i x_i}{\sum_{i=1}^{N} w_i}$$
-
-where $w_i=\frac{1}{\epsilon_i^2}$. Uses [`numpy.average`](https://numpy.org/doc/stable/reference/generated/numpy.average.html#numpy.average).
-
 - `median`: Median of magnitudes.
 
-$$\text{Median} = \begin{cases}
-x_{\left(\frac{n+1}{2}\right)} & \text{if } n \text{ is odd} \\
-\frac{x_{\left(\frac{n}{2}\right)} + x_{\left(\frac{n}{2}+1\right)}}{2} & \text{if } n \text{ is even}
-\end{cases}$$
+$$
+\text{median}(m) = \begin{cases}
+m_{\left(\frac{n+1}{2}\right)} & \text{if } n \text{ is odd} \\
+\frac{m_{\left(\frac{n}{2}\right)} + m_{\left(\frac{n}{2}+1\right)}}{2} & \text{if } n \text{ is even}
+\end{cases}
+$$
 
 Uses [`np.median`](https://numpy.org/doc/stable/reference/generated/numpy.nanmedian.html#numpy.nanmedian)
-- `min`: Minimum value of the magnitudes.
-- `max`: Maximum value of the magnitudes.
-- `ptp`: Peak-to-peak amplitude of the magnitude values. Simply define as the difference between the max and min (range) of magnitudes, $x_{max}-x_{min}$ . (for more robust definitions see the `VariabilityIndex` class below)
+- `min`: Minimum value of the magnitudes, $m_{min}$.
+- `max`: Maximum value of the magnitudes, $m_{max}$.
+- `range`: range peak-to-peak amplitude of the magnitude values. Here, this is simply defined as the difference between the max and min (range) of magnitudes, $m_{max}-m_{min}$ . (for more robust definitions of amplitude, see the `VariabilityIndex` class below)
 - `time_max`: Maximum value of the observation times ($t_{max}$).
 - `time_min`: Minimum value of the observation times ($t_{min}$).
-- `time_span`: Total time-span of the light curve
- 
-$$t_{max}-t_{min}$$ 
+- `time_span`: Total time-span of the light curve, $t_{max}-t_{min}$ 
 <!--
 - `range`: another flavor of ptp amplitude bin in terms of maximum/minimum values of magnitude: $$x_{max}-x_{min}$$ 
 -->
@@ -107,90 +104,67 @@ TODO:
 
 ## `FoldedLightCurve` class
 
+Given that a real variable process, $\{m(t_i)\}$, is present in the observed light curve, we can assume that this process has an underlying characteristic timescale, $\tau$. Whether $\tau$ is a _periodic_ or an _aperiodic_ is the subject of the `TimeSeries` class. Here, whatever is the nature of $\tau$, we assume it can be used to transform the light-curve into a phase-folded representation,  $m_{\phi_i}=\{m(\phi_i)\}$, with $0\leq\phi_i\leq1$. In practice, the transformation $t_i\rightarrow \phi_i$ maps each time observation, $t_i$, into which _phase_ of the of a variability cycle that observation is. In this context, c is:
+ 
+
+$$
+    \phi_i=\frac{t_i-t_0}{\tau}-\Big\lfloor\frac{t_i-t_0}{\tau}\Big\rfloor,
+$$
+
+where $t_0$ is a reference epoch, and $\tilde{\phi_i}=\lfloor\frac{t_i-t_0}{\tau}\rfloor$ reflects the integer (floor) part of the ratio $\frac{t_i-t_0}{\tau}$. 
+
+`FoldedLightCurve` will carry out this mapping:
+
 
 
 ```python
   from variability.lightcurve import  FoldedLightCurve
-  lc_f = FoldedLightCurve(time=time, mag=mag, err=err, timescale=period)
-```
-
-where `timescale` is a timescale to be used for phase-folding the light-curve (for example, the variability period). 
-
-Alternatively:
-
-```python
   lc_f = FoldedLightCurve(lc=lc, timescale=timescale)
 ```
 
-Additionally to the attributes inherited from the `LightCurve`object, a `FoldedLightCurve`light curve has the following additional attributes:
+where `timescale` is a timescale to be used for phase-folding the light-curve (for example, the variability period) and `lc` is a pre-defined `LightCurve` object. Alternatively, `FoldedLightCurve` can be created instead of a `LightCurve` object:
 
-- `timescale`: The timescale used for folding the light curve. Can be a variability period or any characteristic timescale inferred for the light-curve (This can be inferred using the `timescale` module)
-- `reference_time`: Reference time for phase-folding the light-curve. It is set to 0 as default.
-- `phase`: The phase values of the folded light curve (between 0 and 1).
-- `phase_number`: phase number (integer part of the phase calculation)
-- `mag_pahsed`: The magnitude values of the folded light curve, sorted based on phase.
-- `err_pahsed`: The error values of the folded light curve, sorted based on phase.
-- `waveform`: estimated waveform for phase-folded light-curve smoothed using uneven_savgol (default) unless other method is specified. 
-- `residual`: residual phase-folded curve (`mag_phased - waveform`)
+```python
+  lc_f = FoldedLightCurve(time=time, mag=mag, err=err, timescale=period)
+```
 
-All returned values are sorted as a function of phase value. 
+Note that creating `FoldedLightCurve` objects from `LightCurve` objects will result in shared memory location for (`lc.time`, `lc.mag`, `lc.err`) and (`lc_f.time`, `lc_f.mag`, `lc_f.err`).
 
-`FoldedLightCurve` requires a `timescale`, and uses as default the `uneven_savgol` waveform estimator, which requires parameters for window size (`window` set to 25\% the number of epochs as default) and the order of the polynomial fit used by the SavGol method (`polynom=1`). Additionally, unless specified, `reference_time` is set to 0 when phase folding the light curve. Al these parameters can be updated on the go by the `lc_f.refold(timescale=None, reference_time=None, waveform_type=None, waveform_params=None)` method. For example, below, the `FoldedLightCurve` has its waveform estimator updated by keeping the `unevel_savgol` method, but using a polynomial of order 1 and a window with 10 epochs.
+
+ Additionally to the same attributes as a `LightCurve` object, `FoldedLightCurve` has the following additional attributes:
+
+- `phase`: ($\{\phi_i\}$) phase values of the folded light curve ($0\leq\phi_i\leq1$).
+- `phase_number`: ($\{\tilde{\phi_i}\}$) phase number is the integer part of the phase calculation. 
+- `mag_pahsed`: ($m_{\phi_i}=\{m(\phi_i)\}$) magnitude values of the folded light curve, sorted based on ascending phase.
+- `err_pahsed`: ($\epsilon_{\phi_i}=\{\epsilon(\phi_i)\}$) The error values of the folded light curve, sorted based on phase.
+- `waveform`: ($\hat{m}_{\phi_i}$) waveform for phase-folded light curve estimated by smoothing the light curve using uneven_savgol (default) or other method if specified. 
+
+
+
+- `residual`: residual curve obtained by subtracting the waveform from the phase-folded light curve:
+  
+  $$r_{\phi_i}=m_{\phi_i}-\hat{m}_{\phi_i}$$
+
+
+**Note:** `FoldedLightCurve` requires a `timescale`, and uses as default the `uneven_savgol` waveform estimator, which requires parameters for window size (`window` set to 25\% the number of epochs as default) and the order of the polynomial fit used by the SavGol method (`polyorder=2`). Additionally, unless specified, `reference_time` is set to 0 when phase folding the light curve. Al these parameters can be updated on the go by the `lc_f.refold(timescale=None, reference_time=None, waveform_type=None, waveform_params=None)` method. For example, below, the `FoldedLightCurve` has its waveform estimator updated by keeping the `unevel_savgol` method, but using a polynomial of order 1 and a window with 10 epochs.
 
 ```python
 lc_f.refold(waveform_type='uneven_savgol', waveform_params={'polynom':1, 'window':10})
 ```
 
+ `FoldedLightCurve` objects inherit all the described properties from a `LightCurve` object, but has additional properties of its own:
+- `timescale`: ($\tau$) The timescale used for folding the light curve. Can be a variability period or any characteristic timescale inferred for the light-curve (This can be inferred using the `timescale` module)
+- `reference_time`: ($t_0$) Reference time for phase-folding the light-curve. It is set to 0 as default.
+- `waveform_type`: waveform estimator used, `uneven_savgol` as default.
 
-## `SyntheticLightCurve`
-<details>
-**@juliaroquette** Still under implementation, will allow to generate synthetic light-curves for given observational windows. 
 
-```python 
-from variability.lightcurve import FoldedLightCurve
-```
-
-## TO DO list
-
-:white_large_square: **@juliaroquette** It may be worth it consider the possibility of merging `LightCurve` and `FoldedLightCurve` into a single class. <- Consider that after the `timescale.py` package has been implemented. 
-
-:white_large_square: read observational windows from file
-
-:white_large_square: Implement a list of observational windows
-  - :white_large_square: TESS
-  - :white_large_square: Rubin
-  - :heavy_check_mark: ZTF
-  - :heavy_check_mark: ASAS-SN (g and V)
-  - :heavy_check_mark: Gaia-DR3
-  - :heavy_check_mark: Gaia-DR4
-  - :heavy_check_mark: Gaia-DR5
-  - :heavy_check_mark: AllWISE
-  - :white_large_square: input
-
-:white_large_square: Include waveforms 
-  - :heavy_check_mark: PS
-  - :white_large_square: QPS
-  - :white_large_square: EB
-  - :white_large_square: AATAU
-  - :white_large_square: QPD
-  - :white_large_square: QPB
-  - :white_large_square: B
-  - :white_large_square: MP
-  - :white_large_square: LP
-
-:white_large_square: Function that generates a waveform for a refined timestep
-
-  - :white_large_square: Function that convolves the waveform to an observational window
-</details>
-
+**Note**: All returned values are sorted as a function of phase value. 
 
 # Variability Indexes
 
 Include a suite of widely used variability indexes. A great review on this subject is providedby  [Sokolovsky et al. (2017)](https://academic.oup.com/mnras/article-lookup/doi/10.1093/mnras/stw2262) with several of the indexes implemented here discussed there with appropriate referencing. Here, `VariabilityIndex` concentrates on magnitude-domain features. (for time-domain features, see `TimeScale`).
 
 ## `VariabilityIndex`
-
-
 
 To instantiate a `VariabilityIndex` object:
 
@@ -206,41 +180,57 @@ The list of implemented variability indexes currently implemented can be accesse
 
 ``VariabilityIndex._list_properties()``
 
-### 'Usual' Variability indexes:
+This list depends if `VariabilityIndex` was created from a `LightCurve`, in which case all regular light-curve variability indexes implemented are listed; or if it was created from a `FoldedLightCurve(..., timescale)`, which phase-folded the light curve for the provided timescale. In this case, additionally to the regular indexes, with the addition of phase folded indexes. 
+
+### regular light-curve Variability indexes:
+
+These are variability index derived directly from the light curve (time, mag err).
+
+
+#### Weighted Average `weighted_average`: 
+
+Weighted average of the magnitude values using an uncertainty weight, $w_i=\frac{1}{\epsilon_i^2}$:
+
+$$\bar{m}_w = \frac{\sum_{i=1}^{N} w_i m_i}{\sum_{i=1}^{N} w_i}$$
+
+Uses [`numpy.average`](https://numpy.org/doc/stable/reference/generated/numpy.average.html#numpy.average).
+
+#### Bias-corrected standard deviation (`std`)
+
+Standard deviation of the magnitudes [(uses bias corrected `numpy.std`)](https://numpy.org/doc/stable/reference/generated/numpy.std.html).
+
+$$
+\sigma = \sqrt{\frac{1}{N-1} \sum_{i=1}^{N} (m_i - \bar{m})^2}
+$$
+
+For non-variable sources, $\sigma\approx\bar{\epsilon}$, given that uncertainties $\{\epsilon_i\}$ are realistic.
 
 #### signal-to-noise ratio `SNR` 
 
-Defined here as the standard deviation of the data divided by average uncertainty.
-
+Defined here as the standard deviation of the data divided by average uncertainty. 
 
 $$\text{SNR}=\frac{\sigma}{\bar{\epsilon}}$$
 
 
-#### Bias-corrected standard deviation
-
-`std`: Standard deviation of the magnitudes [(uses bias corrected `numpy.std`)](https://numpy.org/doc/stable/reference/generated/numpy.std.html).
-$$
-\sigma = \sqrt{\frac{1}{N-1} \sum_{i=1}^{N} (x_i - \bar{x})^2}
-$$
 
 #### Shapriro-Wilk test (`VariabilityIndex.shapiro_wilk`)
 
-$$W = \frac{\left(\sum_{i=1}^{n} a_i x_{(i)}\right)^2}{\sum_{i=1}^{n} (x_i - \bar{x})^2}$$
+$$W = \frac{\left(\sum_{i=1}^{n} a_i m_{(i)}\right)^2}{\sum_{i=1}^{n} (m_i - \bar{m})^2}$$
 
-Where $W$ is the Shapiro-Wilk statistic, $n$ is the number of observations, $x_i$ are the individual values of the dataset, $\bar{x}$ are the mean (average) of the dataset, and $x_{(i)}$ are the $i$-th order statistic in the sorted dataset. The coefficients $a_i$ are pre-calculated constants based on the sample size and are used in the Shapiro-Wilk test. This is calculated using [`scipy.stats.shapiro`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.shapiro.html).
+Where $W$ is the Shapiro-Wilk statistic, $n$ is the number of observations, $m_i$ are the individual values of the dataset, $\bar{m}$ are the mean (average) of the dataset, and $m_{(i)}$ are the $i$-th order statistic in the sorted dataset. The coefficients $a_i$ are pre-calculated constants based on the sample size and are used in the Shapiro-Wilk test. This is calculated using [`scipy.stats.shapiro`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.shapiro.html).
 
- This is actually an index to test if the distribution is Gaussian. 
+This is actually an index to test if the distribution is Gaussian. But note that this is used here as a ranking feature, rather than a statistical test, hence no p-value is returned. 
 
 Expected behavior:
 - For Gaussian noise (no variability): $W\approx 1$.
 - For symmetric variability, $W\lesssim1$. 
 - For highly asymmetric variability $W\ll 1$.
 
-**Note:** It is good as a complementary index for capture asymmetric variability behaviour. Note that this is used here as a ranking feature, rather than a statistical test, hence no p-value is returned.  
+**Note:** It is good as a complementary index for capture asymmetric variability behaviour. 
 
 #### median absolute deviation (MAD): (`VariabilityIndex.mad`)
 
-  $$\text{MAD} = \text{median} \left( \left| x_i - \text{median}(x) \right| \right)$$
+  $$\text{MAD} = \text{median} \left( \left| m_i - \text{median}(m) \right| \right)$$
 
 Calculate with [`scipy.stats.median_abs_deviation`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.median_abs_deviation.html).
 
@@ -387,17 +377,6 @@ Expected behavior:
 **Note**
 
 
-### Other variability indexes
-
-#### Abbe
-
-~~Calculate Abbe value as in Mowlavi 2014A%26A...568A..78M
-https://www.aanda.org/articles/aa/full_html/2014/08/aa22648-13/aa22648-13.html~~
-
-**Reference:** [Sokolovsky et al. (2017), also Sec. 2.16](https://academic.oup.com/mnras/article-lookup/doi/10.1093/mnras/stw2262)
-
-Also nami
-
 #### Normalized peak-to-peak variability `VariabilityIndex.norm_ptp`
 
 $$\nu = \frac{(x_i-\epsilon_i)_\mathrm{max} - (x_i-\epsilon_i)_\mathrm{min}}{(x_i+\epsilon_i)_\mathrm{max} + (x_i+\epsilon_i)_\mathrm{min}}$$
@@ -447,6 +426,24 @@ Expected behavior:
 
 **Reference:** [Cody+2014](https://iopscience.iop.org/article/10.1088/0004-6256/147/4/82)
 
+<!--
+### Other variability indexes
+
+#### Abbe
+
+~~Calculate Abbe value as in Mowlavi 2014A%26A...568A..78M
+https://www.aanda.org/articles/aa/full_html/2014/08/aa22648-13/aa22648-13.html~~
+
+**Reference:** [Sokolovsky et al. (2017), also Sec. 2.16](https://academic.oup.com/mnras/article-lookup/doi/10.1093/mnras/stw2262)
+
+Also nami
+-->
+
+### Phase-folded variability indexes
+
+These are indexes that required prior assumption on the timescale of variability. 
+
+
 #### Q-index `VariabilityIndex.periodicity_index`
 
 $$Q = \frac{\sigma_\mathrm{res}^2-\bar{\epsilon}^2}{\sigma^2-\bar{\epsilon}^2}$$ 
@@ -471,6 +468,8 @@ Expected behavior:
 **Reference:** [Cody+2014](https://iopscience.iop.org/article/10.1088/0004-6256/147/4/82)
 
 **Note**
+
+#### Means of residuals
 
 
 ## TO DO list
@@ -808,4 +807,46 @@ $$
 
 
 **@juliaroquette** Still under implementation, will include our codes for estimating timescales. 
+
+
+## `SyntheticLightCurve`
+<details>
+**@juliaroquette** Still under implementation, will allow to generate synthetic light-curves for given observational windows. 
+
+```python 
+from variability.lightcurve import FoldedLightCurve
+```
+
+## TO DO list
+
+:white_large_square: **@juliaroquette** It may be worth it consider the possibility of merging `LightCurve` and `FoldedLightCurve` into a single class. <- Consider that after the `timescale.py` package has been implemented. 
+
+:white_large_square: read observational windows from file
+
+:white_large_square: Implement a list of observational windows
+  - :white_large_square: TESS
+  - :white_large_square: Rubin
+  - :heavy_check_mark: ZTF
+  - :heavy_check_mark: ASAS-SN (g and V)
+  - :heavy_check_mark: Gaia-DR3
+  - :heavy_check_mark: Gaia-DR4
+  - :heavy_check_mark: Gaia-DR5
+  - :heavy_check_mark: AllWISE
+  - :white_large_square: input
+
+:white_large_square: Include waveforms 
+  - :heavy_check_mark: PS
+  - :white_large_square: QPS
+  - :white_large_square: EB
+  - :white_large_square: AATAU
+  - :white_large_square: QPD
+  - :white_large_square: QPB
+  - :white_large_square: B
+  - :white_large_square: MP
+  - :white_large_square: LP
+
+:white_large_square: Function that generates a waveform for a refined timestep
+
+  - :white_large_square: Function that convolves the waveform to an observational window
+</details>
 
