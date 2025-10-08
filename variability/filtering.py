@@ -17,8 +17,8 @@ class Filtering:
             raise TypeError("lc must be an instance of LightCurve")
         
         self.even = self.is_evenly_spaced()
-        if not self.even:
-            warnings.warn("Time series may not be evenly spaced.", UserWarning)
+        # if not self.even:
+            # warnings.warn("Time series may not be evenly spaced.", UserWarning)
 
     def filter(self, method=None, **kwargs):
         """
