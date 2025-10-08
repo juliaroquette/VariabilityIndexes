@@ -156,6 +156,23 @@ lc_f.refold(waveform_type='uneven_savgol', waveform_params={'polynom':1, 'window
 - `timescale`: ($\tau$) The timescale used for folding the light curve. Can be a variability period or any characteristic timescale inferred for the light-curve (This can be inferred using the `timescale` module)
 - `reference_time`: ($t_0$) Reference time for phase-folding the light-curve. It is set to 0 as default.
 - `waveform_type`: waveform estimator used, `uneven_savgol` as default.
+- `saunders_norm` Saunders metrics [(Saunders et al. 2006)](https://www.google.com/search?q=saunders+metrics+for+agent+observations+nasa+ads&num=10&sca_esv=7c40ceab512ed81b&sxsrf=AE3TifP_S5nlea_YZ3nVUFwLZSJpOuzfVA%3A1759502542255&ei=zuDfaLeoD5WA9u8P6JCG6Ak&ved=0ahUKEwi3x4zgoYiQAxUVgP0HHWiIAZ0Q4dUDCBA&uact=5&oq=saunders+metrics+for+agent+observations+nasa+ads&gs_lp=Egxnd3Mtd2l6LXNlcnAiMHNhdW5kZXJzIG1ldHJpY3MgZm9yIGFnZW50IG9ic2VydmF0aW9ucyBuYXNhIGFkczIFECEYoAFIpA9Q1AJYtA5wAXgAkAEAmAHlAaABkgiqAQU0LjQuMbgBA8gBAPgBAZgCCaACtAiYAwCIBgGSBwU0LjQuMaAHuB2yBwU0LjQuMbgHtAjCBwUxLjcuMcgHEA&sclient=gws-wiz-serp) diagnosis how _clumpy_ the phase coverage is compared to an ideal case of equally spaced sampling in phase. Based on a the size of the steps in phase between consecutive measurements, this is: 
+
+$\Delta \phi_i =
+\begin{cases}
+\phi_{i+1} - \phi_i, & i = 1, \dots, N-1, \\[6pt]
+(\phi_1 + 1) - \phi_N, & i = N;
+\end{cases}
+$
+
+Then the metrics defined as:
+$$
+S_{\mathrm{norm}} \;=\; 
+\frac{N+1}{\,N-1\,} \left( N \sum_{i=1}^{N} \left( \Delta \phi_i \right)^{2} - 1 \right).
+$$
+
+Where $S_{\mathrm{norm}} = 0$ for perfectly uniform phase coverage, $S_{\mathrm{norm}} \approx 1$ for random uniform phases, and $S_{\mathrm{norm}} => 1$ for clumpy or poor phase coverage.
+
 
 
 **Note**: All returned values are sorted as a function of phase value. 
@@ -248,8 +265,8 @@ $$\chi^2 = \sum_{i=1}^{k} \frac{(O_i - E_i)^2}{E_i}$$
 
 with $\chi^2$ as the chi-squared statistic, $O_i$ is the observed frequency for each category or bin, $E_i$ is the expected frequency for each category or bin, and $k$ are the total number of categories or bins. This is a statistical tests to evaluate if the source is compatible with being constant. This is calculated following the equation:
 
-$$\chi^2 = \sum_{i=1}^{N} \frac{\left( x_i - \bar{x}_w \right)^2}{\epsilon_i^2}, \quad
-\bar{x}_w = \frac{\sum_{i=1}^{N} \frac{x_i}{\epsilon_i^2}}{\sum_{i=1}^{N} \frac{1}{\epsilon_i^2}}$$
+$$\chi^2 = \sum_{i=1}^{N} \frac{\left( m_i - \bar{m}_w \right)^2}{\epsilon_i^2}, \quad
+\bar{m}_w = \frac{\sum_{i=1}^{N} \frac{m_i}{\epsilon_i^2}}{\sum_{i=1}^{N} \frac{1}{\epsilon_i^2}}$$
 
  $\chi^2$ is a statistical test, where in the current context the null-hyposis is that the source is not variable (light curve is dominated by noise, assumed to be gaussian).
 
@@ -290,7 +307,7 @@ Expected behavior:
 
 #### Robust-Median Statistics (RoMS) (`VariabilityIndex.roms`)
 
-$$\text{RoMS} = \frac{1}{N-1}\sum_{i=1}^{N} \frac{\big| x_i - \mathrm{median}(x)\big|}{\epsilon_i},$$
+$$\text{RoMS} = \frac{1}{N-1}\sum_{i=1}^{N} \frac{\big| m_i - \mathrm{median}(m)\big|}{\epsilon_i},$$
 
 This is similar to the MAD, but it takes into consideration the typical uncertainty in the light curve. 
 
@@ -305,7 +322,7 @@ Expected behavior:
 #### normalised Excess Variance (`VariabilityIndex.normalised_excess_variance`)
 
 
-$$\sigma_{\text{NXS}}^2 = \frac{\sigma^2 - \langle \bar{\epsilon}^2 \rangle}{\langle x \rangle^2}$$
+$$\sigma_{\text{NXS}}^2 = \frac{\sigma^2 - \langle \bar{\epsilon}^2 \rangle}{\langle m \rangle^2}$$
 
 It is normalized by the typical uncertainty, *i.e.,* subtracts the mean photometric noise from the data standard deviation and compares this to the mean magnitude. 
 
@@ -321,7 +338,7 @@ Expected behavior:
 #### Lag1AutoCorr ($l_1$) (`VariabilityIndex.lag1_auto_corr`)
 
 
-$$l_1 = \frac{\sum_{i=1}^{N-1} (x_i - \bar{x})(x_{i+1} - \bar{x})}{\sum_{i=1}^{N} (x_i - \bar{x})^2}$$
+$$l_1 = \frac{\sum_{i=1}^{N-1} (m_i - \bar{m})(m_{i+1} - \bar{m})}{\sum_{i=1}^{N} (m_i - \bar{m})^2}$$
 
 First order autocorrelation coefficient. Measures how much a light curve is correlated with itself at one-time-step lag. 
 
@@ -339,8 +356,8 @@ Expected behavior:
 
 
 $$A^2 = -N - \frac{1}{N} \sum_{i=1}^{N} \left[
-\frac{2i - 1}{N} \ln F(x_{(i)}) +
-\left( 1 - \frac{2i - 1}{N} \right) \ln \left( 1 - F(x_{(N-i+1)}) \right)
+\frac{2i - 1}{N} \ln F(m_{(i)}) +
+\left( 1 - \frac{2i - 1}{N} \right) \ln \left( 1 - F(m_{(N-i+1)}) \right)
 \right]$$
 
 Where $A^2$ is the Anderson-Darling statistics, $n$ is the number of observations, $x_{(i)}$ is the $i$-th order statistic in the sorted dataset and $F(x_{(i)})$  is the cumulative distribution function at $x_{(i)}$, assuming a normal distribution. Estimated from [`scipy.stats.anderson`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.anderson.html)
@@ -355,7 +372,7 @@ Expected behavior:
 
 
 #### Skewness (`VariabilityIndex.skewness`)
-$$\text{Skewness} = \frac{\frac{1}{n} \sum_{i=1}^{n} (x_i - \bar{x})^3}{\left(\frac{1}{n} \sum_{i=1}^{n} (x_i - \bar{x})^2\right)^{\frac{3}{2}}}$$
+$$\text{Skewness} = \frac{\frac{1}{n} \sum_{i=1}^{n} (m_i - \bar{m})^3}{\left(\frac{1}{n} \sum_{i=1}^{n} (m_i - \bar{m})^2\right)^{\frac{3}{2}}}$$
 
 Expected behavior:
 - For Gaussian noise: 
@@ -366,7 +383,7 @@ Expected behavior:
 
 
 ####  kurtosis (`VariabilityIndex.kurtosis`)
-$$\text{Kurtosis} = \frac{\frac{1}{n} \sum_{i=1}^{n} (x_i - \bar{x})^4}{\left(\frac{1}{n} \sum_{i=1}^{n} (x_i - \bar{x})^2\right)^2}$$
+$$\text{Kurtosis} = \frac{\frac{1}{n} \sum_{i=1}^{n} (m_i - \bar{m})^4}{\left(\frac{1}{n} \sum_{i=1}^{n} (m_i - \bar{m})^2\right)^2}$$
 
 
 Expected behavior:
@@ -379,9 +396,9 @@ Expected behavior:
 
 #### Normalized peak-to-peak variability `VariabilityIndex.norm_ptp`
 
-$$\nu = \frac{(x_i-\epsilon_i)_\mathrm{max} - (x_i-\epsilon_i)_\mathrm{min}}{(x_i+\epsilon_i)_\mathrm{max} + (x_i+\epsilon_i)_\mathrm{min}}$$
+$$\nu = \frac{(m_i-\epsilon_i)_\mathrm{max} - (m_i-\epsilon_i)_\mathrm{min}}{(m_i+\epsilon_i)_\mathrm{max} + (m_i+\epsilon_i)_\mathrm{min}}$$
 
-where $x_i$ is the magnitude measurement and $\epsilon_i$ is the corresponding measurement error. 
+where $m_i$ is the magnitude measurement and $\epsilon_i$ is the corresponding measurement error. 
 
 
 Expected behavior: measure of variability amplitude
@@ -394,7 +411,7 @@ Expected behavior: measure of variability amplitude
 
 Robust peak-to-peak amplitude estimator defined as the difference between the median values of the tails of the magnitude distribution. Tails are defined as the $p\%$ outermost sources at each side of the distribution.
 
-$$\Delta x_{p}=\text{median}\{x_i:x_i\leq P_{100-p}\}-\text{median}\{x_i:x_i\leq P_{p}\},$$
+$$\Delta m_{p}=\text{median}\{m_i:m_i\leq P_{100-p}\}-\text{median}\{m_i:m_i\leq P_{p}\},$$
 
 Where $P_p$ is the p-th percentile of the distribution of magnitudes. 
 
@@ -412,9 +429,9 @@ Expected behavior: measure of variability amplitude while robust against outlier
 
 #### M-index (`VariabilityIndex.asymmetry_index`)
 
-$$M = \frac{<x_{10\%}>-\text{median\{x\}}}{\sigma_m}$$
+$$M = \frac{<m_{10\%}>-\text{median\{m\}}}{\sigma_m}$$
 
-$<x_{10\%}>$ is all the data in the top and bottom decile of the light-curve. 
+$<m_{10\%}>$ is all the data in the top and bottom decile of the light-curve. 
 Not that there are conflicting definitions in the literature, where $\sigma_m$ is sometimes the overall rms of the light-curve and sometimes its standard-deviation! Here I am using the second one. 
 
 
@@ -446,10 +463,10 @@ These are indexes that required prior assumption on the timescale of variability
 
 #### Q-index `VariabilityIndex.periodicity_index`
 
-$$Q = \frac{\sigma_\mathrm{res}^2-\bar{\epsilon}^2}{\sigma^2-\bar{\epsilon}^2}$$ 
+$$Q = \frac{\sigma_\mathrm{r}^2-\bar{\epsilon}^2}{\sigma^2-\bar{\epsilon}^2}$$ 
 
 where:
-- $\sigma_\mathrm{res}^2$ and $\sigma^2_\mathrm{raw}$ are the ~rms~ variance values of the raw light curve and the phase-subtracted light curve.
+- $\sigma^2$ and $\sigma^2_r$ are the ~~rms~~ variance values of the raw light curve and the phase-subtracted light curve.
 - $\sigma^2$ is the variance of the original light-curve
 - $\bar{\epsilon}$ is the mean photometric error
 
