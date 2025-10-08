@@ -188,7 +188,7 @@ class VariabilityIndex:
         """
         Raw Chi-square value
         """
-        return np.sum((self.lc.mag - self.lc.weighted_average)**2 / self.lc.err**2)
+        return np.sum((self.lc.mag - self.weighted_average)**2 / self.lc.err**2)
 
     @min_epochs_property
     def reduced_chi_square(self):
@@ -304,7 +304,7 @@ class VariabilityIndex:
             mag_sorted = np.sort(self.lc.mag)
             return  np.median(mag_sorted[-tail:]) - np.median(mag_sorted[:tail])
         else:
-            warn("Not enough epochs to calculate the peak-to-peak amplitude for the given percentile")
+            # warn("Not enough epochs to calculate the peak-to-peak amplitude for the given percentile")
             return None
 
     @folded_property
@@ -321,20 +321,20 @@ class VariabilityIndex:
         """
         return np.std(self.lc.residual, ddof=1)
     
-    @folded_property
-    def lafler_kinman(self):
-        """
-        Lafler-Kinman string length index of the folded light-curve
-        """
-        return np.sum((self.lc.mag_phased[1:] - self.lc.mag_phased[:-1])**2) / np.sum(
-            (self.lc.mag_phased - self.lc.mean)**2)
+    # @folded_property
+    # def lafler_kinman(self):
+    #     """
+    #     Lafler-Kinman string length index of the folded light-curve
+    #     """
+    #     return np.sum((self.lc.mag_phased[1:] - self.lc.mag_phased[:-1])**2) / np.sum(
+    #         (self.lc.mag_phased - self.lc.mean)**2)
     
-    @folded_property
-    def string_length(self):
-        """
-        String length index of the folded light-curve
-        """
-        return np.sum(np.sqrt(np.diff(self.lc.mag_phased)**2 + np.diff(self.lc.phase)**2))
+    # @folded_property
+    # def string_length(self):
+    #     """
+    #     String length index of the folded light-curve
+    #     """
+    #     return np.sum(np.sqrt(np.diff(self.lc.mag_phased)**2 + np.diff(self.lc.phase)**2))
     
     
     def _list_properties(self):
