@@ -321,6 +321,10 @@ class VariabilityIndex:
         """
         return np.std(self.lc.residual, ddof=1)
     
+    @folded_property
+    def qm_class(self):
+        return cody14_q_m_classifier(self.parent.M_index, self.parent.Q_index)
+    
     # @folded_property
     # def lafler_kinman(self):
     #     """
@@ -419,7 +423,29 @@ class PeriodicityIndex:
             /(np.std(self.parent.lc.mag_phased, ddof=1)**2 - np.mean(self.parent.lc.err_phased)**2)
 
 
-
+def cody14_q_m_classifier(M_index, Q_index):
+    """
+    Simple classifier based on M and Q indices
+    based on Cody et al. 2014 (https://ui.adsabs.harvard.edu/#abs/2014AJ....147...82C)
+    """
+    if M_index is None or Q_index is None:
+        return None
+    elif (M_index > 0.25) and (0 <= Q_index < 0.11):
+        return 'EB'
+    elif (M_index <= 0.25) and (0 <= Q_index < 0.11):
+        return 'P'
+    elif (abs(M_index) <= 0.25) and (0.11 <= Q_index <= 0.61):
+        return 'QPS'
+    elif (M_index > 0.25) and (0.11 <= Q_index <= 0.61):
+        return 'QPD'
+    elif (M_index > 0.25) and (1 <= Q_index > 0.61):
+        return 'APD'
+    elif (M_index < -0.25) and (Q_index > 0.11):
+        return 'B'
+    elif (abs(M_index) <= 0.25) and (1 <= Q_index > 0.61):
+        return 'S'
+    else:
+        return 'Unclassified'
 
 
 def gaia_AG_proxy(phot_g_mean_flux, phot_g_mean_flux_error, phot_g_n_obs):
