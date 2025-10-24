@@ -86,6 +86,7 @@ class StructureFunction:
         last_params = kwargs.get('last_params', [8.0, 0.001, 10.])
         input_cost = kwargs.get('input_cost', None)
         limits = kwargs.get('limits', [(0.4, 2500.0),(1e-9, 1e-1),(1e-5, 100.0)])
+        blindRange = kwargs.get('blindRange', (1., 14.))
         # # best model fit
         # self.y_fit,\
         # # best model params t0_fit, C0_fit, C1_fit
@@ -105,6 +106,15 @@ class StructureFunction:
                                                   input_cost=input_cost,
                                                   limits=limits
                                                   )
+        # test if the timescale derived is in a blind range
+        if blindRange[0] < self.params[0] < blindRange[1]:
+            if len(self.time_bins[(self.time_bins > blindRange[0]) & (self.time_bins < blindRange[1])]) < 1.:
+                self.blind = True
+            else:
+                self.blind = False
+        else:
+            self.blind = False
+        
     def get_timescale(self, C0C1_min=None, 
                         C0_error_min=None, 
                         C1_error_min=None, 
