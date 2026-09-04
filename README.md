@@ -20,11 +20,11 @@ TO DO:
 
 # `lightcurve` module:
 
-Provides tools for loading light curves as objects. Three distinct classes related to light curves are currently included: 
+Provides tools for loading light curves as objects. Four classes related to light curves are currently included: 
 - `LightCurve`s are the simplest light curves
 - `FoldedLightCurve`s are phase-folded light curves with a known timescale
 - `SyntheticLightCurve` (under construction) provide a suite of models of light curves for different variability modes and survey fingerprints. 
-- `MultiBandLighCurve`  (not implemented yet) deals with (quasi-)simultaneous multiband light curves.
+- `MultiBandLightCurve` deals with (quasi-)simultaneous multiband light curves: a per-epoch `time`, `mag`, `err`, plus a `band` label array. It is a thin data container (not a `LightCurve` subclass) - use `mblc.get_band('g')` (or `mblc['g']`) to get a single-band `LightCurve` for per-band analyses (`VariabilityIndex`, phase-folding, structure function, ...), which are not implemented directly on `MultiBandLightCurve`. Its main current use is feeding a joint, shared-period Lomb-Scargle periodogram across bands, via `TimeScale` (see the `timescales` module below).
 
 Throughout this documentation, we approach an observed light-curve as a series of observations, $\lbrace m_i\rbrace $, where:
 
@@ -688,6 +688,67 @@ Whenever the LSP periodogram is computed (`method='LSP'` or `'auto'`), `TimeScal
 - `ts.peak_Q`, `ts.best_Q_period`, `ts.best_Q`: the Cody+14 Q-index (see `VariabilityIndex.periodicity_index` above) evaluated by phase-folding the light curve at each of the top `q_top_k` (default 3) candidate periods. A genuine period folds cleanly (`Q` close to 0); an alias or sampling artifact usually doesn't — this is a much stronger period-validity check than periodogram power alone, and `best_Q_period` can be a better "true period" pick than the highest-power peak.
 
 Independently of `method`, `TimeScale` also derives an autocorrelation-function (ACF) timescale by default (disable with `compute_acf=False`): `ts.ACF_ts` is the lag at which an ACF curve derived from the structure function ($\mathrm{ACF}(\tau) = 1 - SF(\tau)/2\sigma^2$, valid for a stationary process) first crosses $1/e$, with the full curve kept in `ts.ACF_lags`/`ts.ACF_values`. This reuses the structure-function binning (see below) and does not require `iminuit`.
+
+### Usage example
+
+```python
+import numpy as np
+from variability.lightcurve import LightCurve
+from variability.timescales import TimeScale
+
+N = 150
+time = np.sort(np.random.uniform(0, 100, N))
+err = 0.01 * np.random.random_sample(N) + 0.01
+period = 10.
+mag = 0.3 * np.sin(2 * np.pi * time / period) + np.random.normal(scale=0.02, size=N)
+lc = LightCurve(time=time, mag=mag, err=err)
+
+ts = TimeScale(lc, method='auto')
+print(ts.method, ts.ts)             # e.g. 'LSP' 9.94...
+
+print(ts.peak_periods[:3])          # top-3 candidate periods
+print(ts.peak_Q[:3])                # Q-index at each of those periods - low near the true period
+print(ts.best_Q_period, ts.best_Q)  # cleanest-folding candidate
+
+print(ts.spectral_entropy, ts.power_concentration)
+print(ts.ACF_ts)                    # autocorrelation-derived timescale
+```
+
+**Note:** for a perfectly evenly-sampled `time` array (e.g. `np.linspace(...)`), astropy's Lomb-Scargle `'slow'` implementation can produce exact-zero power at some frequencies, which currently propagates into `NaN` `spectral_entropy`/`power_concentration` (with `RuntimeWarning`s) rather than being handled gracefully - use `np.sort(np.random.uniform(...))`-style irregular sampling (as above, and as is realistic for most surveys) to avoid it until this is fixed.
+
+### Multiband light curves
+
+`lc` may also be a `MultiBandLightCurve` (see the `lightcurve` module above), in which case the LSP periodogram is computed jointly across bands with a single shared period, via [`astropy.timeseries.LombScargleMultiband`](https://docs.astropy.org/en/stable/timeseries/lombscargle.html) (its fitting method - `'fast'` or `'flexible'` - is chosen via `multiband_method`, default `'fast'`). Everything downstream of the periodogram (`peak_periods`, `peak_powers`, `spectral_entropy`, `power_concentration`, ...) works the same as for a single-band `LightCurve`. There are three caveats specific to the multiband path, each of which degrades gracefully with a `UserWarning` rather than raising:
+
+- `LombScargleMultiband.false_alarm_probability()` is not implemented in astropy (as of 5.3) - `ts.fap` and `ts.periodogram_fap` are `NaN`. Since the `method='auto'` significance check (`fap < fap_prob`) can never pass when `fap` is `NaN`, `auto` will *not* auto-select `'LSP'` for multiband input - pass `method='LSP'` explicitly if you want to accept the joint-periodogram timescale regardless.
+- `definition='Chloe'`/`'Gaia'` custom fixed-step frequency grids are single-band-only; the standard `autopower` grid is always used for multiband input, regardless of `definition`.
+- The per-peak Q-index (`get_peak_Q_periodicity`), the structure-function timescale (`method='SF'`), and the ACF timescale all fold/analyse a single band internally and are not yet implemented for `MultiBandLightCurve` - they're skipped (features left `None`/`NaN`) rather than computed. Use `mblc.get_band('g')` to get a single-band `LightCurve` for those.
+
+```python
+from variability.lightcurve import MultiBandLightCurve
+from variability.timescales import TimeScale
+
+# e.g. mixing ASAS-SN g/V, ZTF g/r, or Gaia G/BP/RP epochs into one object
+time_g = np.sort(np.random.uniform(0, 100, 90))
+time_r = np.sort(np.random.uniform(0, 100, 60))
+mag_g = 15.0 + 0.3 * np.sin(2 * np.pi * time_g / period) + np.random.normal(scale=0.01, size=len(time_g))
+mag_r = 14.6 + 0.2 * np.sin(2 * np.pi * time_r / period + 0.4) + np.random.normal(scale=0.015, size=len(time_r))
+err_g = np.full(len(time_g), 0.01)
+err_r = np.full(len(time_r), 0.015)
+
+mblc = MultiBandLightCurve(
+    time=np.concatenate([time_g, time_r]),
+    mag=np.concatenate([mag_g, mag_r]),
+    err=np.concatenate([err_g, err_r]),
+    band=np.array(['g'] * len(time_g) + ['r'] * len(time_r)),
+)
+print(mblc)                     # <MultiBandLightCurve(n_epochs=150, bands={'g': 90, 'r': 60})>
+
+ts_mb = TimeScale(mblc, method='LSP')   # explicit 'LSP': fap is NaN for multiband, see above
+print(ts_mb.method, ts_mb.ts)   # 'LSP', close to the shared injected period
+
+lc_g = mblc.get_band('g')       # single-band LightCurve, e.g. for VariabilityIndex or phase-folding
+```
 
 ## Structure functions
 

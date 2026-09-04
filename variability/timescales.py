@@ -23,10 +23,10 @@ previous update: 28 July 2025
 """
 
 import numpy as np
-from astropy.timeseries import LombScargle
+from astropy.timeseries import LombScargle, LombScargleMultiband
 from scipy.signal import find_peaks
 import warnings
-from variability.lightcurve import LightCurve
+from variability.lightcurve import LightCurve, MultiBandLightCurve
 from variability.structure_function import StructureFunction
 
 
@@ -55,11 +55,27 @@ class TimeScale:
 
     Independently of `method`, an ACF-derived timescale is computed by
     default (disable with `compute_acf=False`).
+
+    `lc` may also be a `MultiBandLightCurve` (see variability.lightcurve),
+    in which case the LSP periodogram is computed jointly across bands
+    with a shared period via `astropy.timeseries.LombScargleMultiband`
+    (`multiband_method`, default 'fast', selects its fitting method - see
+    that class's documentation for 'fast' vs 'flexible'). Note that:
+    - `LombScargleMultiband` does not implement `false_alarm_probability`
+      (as of astropy 5.3) - `self.fap`/`self.periodogram_fap` will be NaN,
+      and `definition='Chloe'`/`'Gaia'` custom frequency grids are not
+      supported for multiband input (the standard `autopower` grid is
+      used regardless of `definition`).
+    - the structure-function (`method='SF'`), ACF, and per-peak Q-index
+      features all require a single-band `LightCurve` internally and are
+      not yet implemented for `MultiBandLightCurve`; they fail gracefully
+      (with a warning, feature left as NaN/None) rather than raising.
     """
     def __init__(self, lc, **kwargs):
-        if not isinstance(lc, LightCurve):
-            raise TypeError("lc must be an instance of LightCurve")
+        if not isinstance(lc, (LightCurve, MultiBandLightCurve)):
+            raise TypeError("lc must be an instance of LightCurve or MultiBandLightCurve")
         self.lc = lc
+        self._multiband_method = kwargs.get('multiband_method', 'fast')
         # initialize timescale attributes
         self.ts = np.nan
         self.ts_err = np.nan
@@ -124,7 +140,7 @@ class TimeScale:
                 self.ts = 1.*self.LSP_ts
                 self.method = 'LSP'
 
-            # periodogram peak / shape / Q features, always available once
+            # periodogram peak / shape features, always available once
             # the LSP periodogram has been computed, regardless of whether
             # it ended up being the chosen timescale method.
             n_peaks = kwargs.get('n_peaks', 10)
@@ -133,15 +149,37 @@ class TimeScale:
                     self.get_periodogram_peaks(n_peaks=n_peaks,
                                                 min_freq_sep=kwargs.get('min_freq_sep'))
                     self.get_periodogram_shape()
-                    q_top_k = kwargs.get('q_top_k', 3)
-                    if q_top_k > 0:
-                        self.get_peak_Q_periodicity(top_k=min(q_top_k, n_peaks))
                 except Exception as e:
-                    warnings.warn(f"Periodogram peak/shape/Q features failed: {e}")
+                    warnings.warn(f"Periodogram peak/shape features failed: {e}")
+
+                # per-peak Q-index requires phase-folding a single-band
+                # LightCurve, which MultiBandLightCurve does not support yet
+                q_top_k = kwargs.get('q_top_k', 3)
+                if q_top_k > 0 and isinstance(self.lc, MultiBandLightCurve):
+                    warnings.warn(
+                        "Per-peak Q-index is not yet supported for MultiBandLightCurve; "
+                        "skipping (peak_Q left as None). Use lc.get_band(band) for a "
+                        "single-band LightCurve if you need it.", UserWarning
+                    )
+                elif q_top_k > 0:
+                    try:
+                        self.get_peak_Q_periodicity(top_k=min(q_top_k, n_peaks))
+                    except Exception as e:
+                        warnings.warn(f"Periodogram peak Q-index failed: {e}")
 
         # if method is set to SF, or if no timescale was obtained from LS
         # then proceed to get timescale from SF
-        if method == 'SF' or (method == 'auto' and (self.method is None)):
+        # (structure-function timescale requires a single-band LightCurve;
+        # not yet supported for MultiBandLightCurve)
+        if (method == 'SF' or (method == 'auto' and (self.method is None))) \
+                and isinstance(self.lc, MultiBandLightCurve):
+            warnings.warn(
+                "Structure-function timescale is not yet supported for "
+                "MultiBandLightCurve; skipping (SF_ts left as NaN). Use "
+                "lc.get_band(band) for a single-band LightCurve if you need it.",
+                UserWarning
+            )
+        elif method == 'SF' or (method == 'auto' and (self.method is None)):
             try:
                 ts, ts_err, C0, C1, cost_min = self.get_structure_function_timescale(
                     bin_params=kwargs.get('sf_bin_params'),
@@ -160,7 +198,14 @@ class TimeScale:
                 warnings.warn(f"Structure Function failed: {e}")
 
         # ACF-derived timescale: independent of which method was used above
-        if kwargs.get('compute_acf', True):
+        # (also requires a single-band LightCurve internally, via StructureFunction)
+        if kwargs.get('compute_acf', True) and isinstance(self.lc, MultiBandLightCurve):
+            warnings.warn(
+                "ACF timescale is not yet supported for MultiBandLightCurve; "
+                "skipping (ACF_ts left as NaN). Use lc.get_band(band) for a "
+                "single-band LightCurve if you need it.", UserWarning
+            )
+        elif kwargs.get('compute_acf', True):
             try:
                 self.get_acf_timescale(bin_params=kwargs.get('sf_bin_params'))
             except Exception as e:
@@ -205,7 +250,42 @@ class TimeScale:
             frequency of the highest peak: float
             power of the highest peak: float
             FAP_highest_peak: 0-1. float: False Alarm Probability for the highest peak
+
+        If `self.lc` is a `MultiBandLightCurve`, a joint periodogram is
+        computed instead via `astropy.timeseries.LombScargleMultiband`
+        (see the `TimeScale` class docstring for the caveats that apply -
+        no `definition='Chloe'/'Gaia'` custom grids, and FAP is NaN).
         """
+        if isinstance(self.lc, MultiBandLightCurve):
+            ls = LombScargleMultiband(self.lc.time, self.lc.mag, self.lc.band, self.lc.err)
+            # LombScargleMultiband only supports 'fast'/'flexible' methods
+            # (no 'slow'), so the Chloe/Gaia fixed-step grids used for
+            # single-band light curves aren't available here - always use
+            # the standard autopower grid.
+            frequency, power = ls.autopower(method=self._multiband_method,
+                                            samples_per_peak=osf,
+                                            minimum_frequency=fmin,
+                                            maximum_frequency=fmax)
+            try:
+                self.FAP_probs = ls.false_alarm_probability()
+            except NotImplementedError:
+                self.FAP_probs = np.full_like(power, np.nan)
+                warnings.warn(
+                    "false_alarm_probability is not implemented for "
+                    "LombScargleMultiband; self.fap/periodogram_fap will be NaN.",
+                    UserWarning
+                )
+            self.periodogram_freq = frequency
+            self.periodogram_power = power
+            self.periodogram_fap = self.FAP_probs
+            if bool(periodogram):
+                return frequency, power, self.FAP_probs
+            else:
+                freq_highest_peak = frequency[np.argmax(power)]
+                power_highest_peak = power.max()
+                FAP_highest_peak = self.FAP_probs[np.argmax(power)]
+                return freq_highest_peak, power_highest_peak, FAP_highest_peak
+
         # define the base for the Lomb-Scargle
         ls = LombScargle(self.lc.time, self.lc.mag, self.lc.err)
         if definition == 'Chloe':

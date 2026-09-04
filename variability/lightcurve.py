@@ -560,3 +560,100 @@ class DetrendedLightCurve:
     def get_raw_mag(self):
         """Return the original unmodified magnitudes."""
         return self.raw_mag
+
+
+class MultiBandLightCurve:
+    """
+    Container for (quasi-)simultaneous multiband light curves: per-epoch
+    time, magnitude, and uncertainty, plus a `band` label identifying
+    which filter/survey each epoch belongs to (e.g. mixing ASAS-SN g+V,
+    ZTF g+r, or Gaia G/BP/RP epochs into a single object).
+
+    This is intentionally a thin, standalone container rather than a
+    `LightCurve` subclass: `LightCurve`'s constructor does its own
+    internal finite-value masking and time-sorting without exposing the
+    resulting index permutation, which would make it awkward for a
+    subclass to keep an extra `band` array correctly aligned. Use
+    `get_band(band)` to get a proper single-band `LightCurve` instead.
+
+    Primarily intended to feed a joint, shared-period Lomb-Scargle
+    periodogram across bands: `variability.timescales.TimeScale` uses
+    `astropy.timeseries.LombScargleMultiband` when given one of these.
+    Per-band analyses (`VariabilityIndex`, phase-folding, structure
+    function, ...) are not implemented directly on a
+    `MultiBandLightCurve` - use `get_band(band)` to get a single-band
+    `LightCurve` for those.
+    """
+    def __init__(self, *, time, mag, err, band):
+        time = np.asarray(time, dtype=float)
+        mag = np.asarray(mag, dtype=float)
+        err = np.asarray(err, dtype=float)
+        band = np.asarray(band)
+        if not (len(time) == len(mag) == len(err) == len(band)):
+            raise ValueError("time, mag, err, and band must all have the same shape")
+        mask = np.isfinite(time) & np.isfinite(mag) & np.isfinite(err)
+        if not mask.any():
+            raise ValueError("No finite (time, mag, err) triplets in MultiBandLightCurve")
+        self.time = time[mask]
+        self.mag = mag[mask]
+        self.err = err[mask]
+        self.band = band[mask]
+        #
+        # makes sure light curves are sorted by time
+        #
+        sorted_indices = np.argsort(self.time)
+        self.time = self.time[sorted_indices]
+        self.mag = self.mag[sorted_indices]
+        self.err = self.err[sorted_indices]
+        self.band = self.band[sorted_indices]
+
+    @property
+    def n_epochs(self):
+        """Total number of datapoints across all bands."""
+        return int(len(self.mag))
+
+    @property
+    def time_span(self):
+        """Total time-span of the (combined) light curve."""
+        return np.max(self.time) - np.min(self.time)
+
+    @property
+    def bands(self):
+        """Sorted array of unique band labels present."""
+        return np.unique(self.band)
+
+    @property
+    def n_bands(self):
+        """Number of distinct bands present."""
+        return len(self.bands)
+
+    def n_epochs_in_band(self, band):
+        """Number of epochs belonging to a given band label."""
+        return int(np.sum(self.band == band))
+
+    def get_band(self, band):
+        """
+        Returns a single-band `LightCurve` for the given band label.
+
+        Args:
+            band: band label to select (must match a value in `self.band`).
+
+        Returns:
+            LightCurve: the epochs belonging to `band`.
+        """
+        selection = self.band == band
+        if not selection.any():
+            raise KeyError(
+                f"No epochs found for band {band!r}; available bands: {list(self.bands)}"
+            )
+        return LightCurve(time=self.time[selection], mag=self.mag[selection], err=self.err[selection])
+
+    def __getitem__(self, band):
+        return self.get_band(band)
+
+    def __len__(self):
+        return self.n_epochs
+
+    def __repr__(self):
+        counts = {b: self.n_epochs_in_band(b) for b in self.bands}
+        return f"<MultiBandLightCurve(n_epochs={self.n_epochs}, bands={counts})>"
