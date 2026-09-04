@@ -424,9 +424,15 @@ Here there are 3 flavours implemented:
 
 Expected behavior: measure of variability amplitude while robust against outliers. The smaller the percentile, the more sensitive it will be against extreme asymmetric variability. The higher p may work better for describing the typical variability amplitude. 
 
-#### weighted standard deviation
+#### weighted standard deviation (`VariabilityIndex.weighted_std`)
 
-**Not implemented yet.** `VariabilityIndex.weighted_average` exists (weighted mean, see above), but there is no corresponding weighted *standard deviation* in `indexes.py`. This entry documents an index that still needs to be added.
+$$\sigma_w = \sqrt{\frac{N}{N-1}\cdot\frac{\sum_{i=1}^{N} w_i (m_i - \bar{m}_w)^2}{\sum_{i=1}^{N} w_i}}, \qquad w_i=\frac{1}{\epsilon_i^2}$$
+
+where $\bar{m}_w$ is the weighted average magnitude (`VariabilityIndex.weighted_average`). Analogous to `std` above, but epochs with larger uncertainty contribute less to the estimate; for a light curve with uniform uncertainties it reduces exactly to `std`.
+
+Expected behavior:
+- For non-variable sources, $\sigma_w\approx\bar{\epsilon}$, same as `std`.
+- Unlike `std`, it is not inflated by a handful of high-uncertainty epochs — useful when a light curve mixes epochs of very different photometric quality (e.g. combining data taken in different observing conditions).
 
 **Reference:** [Sokolovsky et al. (2017), Sec. 2.2](https://academic.oup.com/mnras/article-lookup/doi/10.1093/mnras/stw2262)
 

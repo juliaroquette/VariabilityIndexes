@@ -20,6 +20,7 @@ __This currently includes__
 - mad
 - periodicity_index
 - stetsonK
+- weighted_std
 
 -> Add:
 - gaia_AG_proxy
@@ -119,6 +120,21 @@ class VariabilityIndex:
         # this avoids division by zero:
         weights = np.clip(1./(self.lc.err**2), 1e-12, None)
         return np.average(self.lc.mag, weights=weights)
+
+    @min_epochs_property
+    def weighted_std(self):
+        """
+        Returns the weighted standard deviation of the magnitude values,
+        using the same per-epoch weights (1/err^2) as `weighted_average`.
+
+        Returns:
+            float: Weighted standard deviation.
+        """
+        # this avoids division by zero:
+        weights = np.clip(1./(self.lc.err**2), 1e-12, None)
+        variance = np.average((self.lc.mag - self.weighted_average)**2, weights=weights)
+        # bias-correct with N/(N-1), matching the ddof=1 convention used by `std`
+        return np.sqrt(self.lc.n_epochs / (self.lc.n_epochs - 1.) * variance)
 
     @min_epochs_property
     def signal_to_noise(self):
