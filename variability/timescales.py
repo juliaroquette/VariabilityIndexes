@@ -31,13 +31,32 @@ class TimeScale_refactored:
         # time differences between consecutive epochs
         self.dt = np.diff(np.sort(self.lc.time))
         # some statistics on the time differences
-        self.median_dt = np.median(self.dt)
-        self.mean_dt = np.mean(self.dt)
-        self.geom_mean_dt = np.exp(np.mean(np.log(self.dt)))
-        self.min_dt = np.min(self.dt)
-        self.max_dt = np.max(self.dt)
+
+    @property
+    def median_dt(self):
+        return np.median(self.dt)
+    
+    @property
+    def mean_dt(self):
+        return np.mean(self.dt)
+    
+    
+    @property
+    def min_dt(self):
+        return np.min(self.dt)
+
+    @property
+    def max_dt(self):
+        return np.max(self.dt)
+
+    @property
+    def max_freq(self, **kwargs):
         # average time difference between the 5 smallest time differences
-        self.max_freq = kwargs.get('max_freq', 1./2./np.sort(self.dt)[:5].mean())
+        return kwargs.get('max_freq', 1./2./np.sort(self.dt)[:5].mean())
+
+    @property
+    def geom_mean_dt(self):
+        return np.exp(np.mean(np.log(self.dt)))
 
     def get_GLS_periodogram(self, method='slow', samples_per_peak=5, normalization='standard'):
         ls = LombScargle(self.time, self.mag, self.err, method=method, normalization=normalization)
@@ -167,6 +186,10 @@ class TimeScale:
         if definition == 'Chloe':
             frequency = np.arange(fmin, fmax, step=0.0002)
             power = ls.power(frequency, method='slow')
+        elif definition == 'Gaia':
+            STEP =  1. / 2000. / 5.
+            frequency = np.arange(fmin, fmax, step=STEP)
+            power = ls.power(frequency, method='slow')            
         else:
             frequency, power = ls.autopower(samples_per_peak=osf,
                                             minimum_frequency=fmin,
@@ -235,9 +258,9 @@ def pre_defined_parameters(time, definition='Gaia'):
         This is the maximum frequency for the periodogram.
     """
     if definition == 'Gaia':
-        osf = 10
+        osf = 5
         min_freq = 0.001
-        max_freq = 2.8
+        max_freq = 2.5
     elif definition == 'Chloe':
         # Chloe defined that dynamically where she actually fiexes the df
         osf = 5
@@ -246,7 +269,7 @@ def pre_defined_parameters(time, definition='Gaia'):
     elif definition == 'auto':
         osf = 5
         # Guarantees at least one full period cycle is covered
-        min_freq = 1 / (max(time) - min(time)/2)
+        min_freq = 1 / ((max(time) - min(time))/2)
         max_freq = 1./ 0.5 / (np.median(np.diff(time)))
     else:
         raise ValueError("Definition must be 'Gaia', 'auto', or 'Chloe'")        

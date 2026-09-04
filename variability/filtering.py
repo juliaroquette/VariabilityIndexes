@@ -5,6 +5,8 @@ Colection of fitlers
 import warnings
 import numpy as np
 import scipy as sp
+import scipy.signal
+import scipy.ndimage
 import pandas as pd
 from astropy.convolution import Box1DKernel, convolve
 
@@ -101,7 +103,7 @@ class Filtering:
         Source:
         """
         window = self.get_num_time(timescale)
-        return scipy.ndimage.median_filter(self.lc.mag, size=window, mode='nearest')
+        return sp.ndimage.median_filter(self.lc.mag, size=window, mode='nearest')
     
         
     def savgol_longtrend(self, timescale=10., polyorder=3) :
@@ -148,7 +150,7 @@ class Filtering:
         self.lc.time = np.asarray(self.lc.time, dtype=float)[mask]
         self.lc.mag = np.asarray(self.lc.mag, dtype=float)[mask]
         self.lc.err = np.asarray(self.lc.err, dtype=float)[mask]
-        if isinstance(self, FoldedLightCurve):
+        if isinstance(self.lc, FoldedLightCurve):
             # if the light curve is folded, we need to update the phase
             self.lc._get_phased_values()
             self.lc.wf = WaveForm(self.lc.phase, self.lc.mag_phased)

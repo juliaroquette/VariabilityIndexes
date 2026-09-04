@@ -323,7 +323,7 @@ class VariabilityIndex:
     
     @folded_property
     def qm_class(self):
-        return cody14_q_m_classifier(self.parent.M_index, self.parent.Q_index)
+        return cody14_q_m_classifier(self.asymmetry_index, self.periodicity_index)
     
     # @folded_property
     # def lafler_kinman(self):
@@ -438,11 +438,11 @@ def cody14_q_m_classifier(M_index, Q_index):
         return 'QPS'
     elif (M_index > 0.25) and (0.11 <= Q_index <= 0.61):
         return 'QPD'
-    elif (M_index > 0.25) and (1 <= Q_index > 0.61):
+    elif (M_index > 0.25) and (0.61 < Q_index <= 1):
         return 'APD'
     elif (M_index < -0.25) and (Q_index > 0.11):
         return 'B'
-    elif (abs(M_index) <= 0.25) and (1 <= Q_index > 0.61):
+    elif (abs(M_index) <= 0.25) and (0.61 < Q_index <= 1):
         return 'S'
     else:
         return 'Unclassified'
