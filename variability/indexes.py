@@ -19,16 +19,13 @@ __This currently includes__
 - norm_ptp
 - mad
 - periodicity_index
+- stetsonK
 
 -> Add:
 - gaia_AG_proxy
 
-- double check against the Gaia implementation 
+- double check against the Gaia implementation
 
-
-
-__ Under implementation __
-- stetsonK
 
 __TO DO__
 - fix is_flux flag after it got removed from LightCurve
@@ -162,18 +159,19 @@ class VariabilityIndex:
         else:
             return None
 
-    # this is bugged     
-    # @property   
+    @min_epochs_property
     def stetsonK(self):
         """
-        Calculate Stetson index K
+        Stetson K index (Stetson 1996, PASP, 108, 851).
+
+        A kurtosis-like statistic built from the per-epoch residuals
+        normalised by their photometric uncertainty. It measures how
+        "peaked" or "flat" the magnitude distribution is relative to a
+        Gaussian, independently of the residuals' overall amplitude.
         """
-        print('odl implementation has a bug')
-        return None    
-    #     residual = np.sqrt(self.lc.n_epochs)/(self.lc.n_epochs- 1.)*\
-    #         (self.mag - self.lc.weighted_average)/self.err
-    #     return np.sum(np.fabs(residual)
-    #                   )/np.sqrt(self.lc.n_epochs*np.sum(residual**2))
+        delta = np.sqrt(self.lc.n_epochs / (self.lc.n_epochs - 1.)) * \
+            (self.lc.mag - self.weighted_average) / self.lc.err
+        return np.sum(np.fabs(delta)) / np.sqrt(self.lc.n_epochs * np.sum(delta**2))
 
 
     @min_epochs_property

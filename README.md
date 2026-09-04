@@ -446,6 +446,19 @@ Expected behavior:
 
 **Reference:** [Cody+2014](https://iopscience.iop.org/article/10.1088/0004-6256/147/4/82)
 
+#### Stetson K index (`VariabilityIndex.stetsonK`)
+
+$$\delta_i = \sqrt{\frac{N}{N-1}} \frac{m_i - \bar{m}_w}{\epsilon_i}, \qquad K = \frac{\sum_{i=1}^{N} |\delta_i|}{\sqrt{N \sum_{i=1}^{N} \delta_i^2}}$$
+
+where $\bar{m}_w$ is the weighted average magnitude (`VariabilityIndex.weighted_average`). A kurtosis-like statistic built from the per-epoch residuals normalised by their photometric uncertainty; unlike `kurtosis` above it explicitly accounts for the uncertainty of each individual epoch rather than treating all points equally.
+
+Expected behavior:
+- For Gaussian noise: $K\approx2/\sqrt{2\pi}\approx0.798$.
+- For variability dominated by rare, sharp extrema (e.g. eclipses, dips): $K<0.798$ (leptokurtic; most residuals are small, a few are large).
+- For smoothly varying, broad-distribution variability (e.g. sinusoids): $K>0.798$ (platykurtic; residuals are more evenly spread than Gaussian).
+
+**Reference:** [Stetson (1996), PASP, 108, 851](https://ui.adsabs.harvard.edu/abs/1996PASP..108..851S)
+
 <!--
 ### Other variability indexes
 
@@ -495,7 +508,7 @@ Expected behavior:
 ## TO DO list
 
 <details>
-- :white_large_square: Fix Stetson-index implementation
+- :heavy_check_mark: Fix Stetson-index implementation
 - :white_large_square: Complete Variability-index documentation
   - :white_large_square: Complete description
   - :white_large_square: add examples
