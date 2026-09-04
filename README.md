@@ -508,8 +508,21 @@ Expected behavior:
 
 **Note**
 
-#### Means of residuals
+#### Means of residuals (`VariabilityIndex.residual_mean`, `VariabilityIndex.residual_std`)
 
+Mean and (bias-corrected) standard deviation of the residual curve ($r_{\phi_i}=m_{\phi_i}-\hat{m}_{\phi_i}$, see the `FoldedLightCurve.residual` attribute above) - i.e. the same $\sigma_\mathrm{r}$ that enters the Q-index numerator, exposed on its own as it can be a useful feature independently of $Q$.
+
+#### Saunders norm (`VariabilityIndex.saunders_norm`)
+
+Exposes `FoldedLightCurve.saunders_norm` (see the `FoldedLightCurve` class above) through `VariabilityIndex`, diagnosing how clumpy the phase coverage of the fold is (0 = perfectly uniform, ~1 = random uniform, >1 = clumpy).
+
+#### Lafler-Kinman (`VariabilityIndex.lafler_kinman`) and String Length (`VariabilityIndex.string_length`)
+
+$$\Theta_{LK} = \frac{\sum_{i=1}^{N} (m_{\phi_{i+1}} - m_{\phi_i})^2}{\sum_{i=1}^{N} (m_{\phi_i} - \bar{m})^2}, \qquad L_{SL} = \sum_{i=1}^{N} \sqrt{(\phi_{i+1}-\phi_i)^2 + (m_{\phi_{i+1}} - m_{\phi_i})^2}$$
+
+where the sums run over the phase-sorted, folded light curve, wrapping around so that index $N+1$ means index $1$ (the fold is circular in phase). Both are classic period-search statistics: minimised when the light curve is folded at (or near) its true period, since consecutive phase-sorted points then have similar magnitudes; larger for a poor/aperiodic fold.
+
+**References:** Lafler & Kinman (1965), ApJS, 11, 216; Dworetsky (1983), MNRAS, 203, 917.
 
 ## TO DO list
 

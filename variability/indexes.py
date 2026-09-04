@@ -21,6 +21,9 @@ __This currently includes__
 - periodicity_index
 - stetsonK
 - weighted_std
+- saunders_norm
+- lafler_kinman
+- string_length
 
 -> Add:
 - gaia_AG_proxy
@@ -29,15 +32,18 @@ __This currently includes__
 
 
 __TO DO__
-- fix is_flux flag after it got removed from LightCurve
-- Add documenation to each method
-- Add references 
-- Add Saunders
-- Add SL
-- Add periodic/aperiodic timescales as an index?
+- Add references
+
+__Resolved design questions__
+- Periodic/aperiodic timescales are *not* indexes here: they live in
+  `variability.timescales.TimeScale` instead, kept as a separate class
+  because `TimeScale.get_peak_Q_periodicity` already depends on
+  `VariabilityIndex` (folding the light curve at candidate periods and
+  reading `periodicity_index`) - merging them back in would create a
+  circular import.
 
 
-Last update: 02-02-2024
+Last update: 04-09-2026
 """
 import inspect
 import numpy as np
@@ -150,14 +156,51 @@ class VariabilityIndex:
 
     @min_epochs_property
     def shapiro_wilk(self):
+        """
+        Shapiro-Wilk statistic (Shapiro & Wilk 1965, Biometrika, 52, 591)
+        testing how consistent the magnitude distribution is with a
+        Gaussian. Used here as a ranking feature rather than a formal
+        statistical test (no p-value is returned). See
+        `scipy.stats.shapiro`.
+
+        Expected behavior:
+        - For Gaussian noise (no variability): W~1.
+        - For symmetric variability: W<=1.
+        - For highly asymmetric variability: W<<1.
+        """
         return ss.shapiro(self.lc.mag)[0]
 
     @folded_property
     def periodicity_index(self):
+        """
+        Cody+2014 Q-index: the periodicity index of the folded light-curve,
+        see `PeriodicityIndex` below.
+
+        Expected behavior:
+        - For strictly periodic sources: Q~0.
+        - For aperiodic sources: Q~1.
+
+        Reference: Cody et al. (2014), AJ, 147, 82.
+        """
         return PeriodicityIndex(parent=self).value
 
     @min_epochs_property
     def asymmetry_index(self):
+        """
+        Cody+2014 M-index: asymmetry of the magnitude distribution
+        between its top/bottom `M_percentile` (default 10%, set via the
+        `M_percentile` kwarg passed to `VariabilityIndex`) and the median,
+        see `AsymmetryIndex` below. Pass `M_is_flux=True` if `lc.mag` is
+        actually in flux rather than magnitude units, to flip the sign
+        convention accordingly.
+
+        Expected behavior:
+        - For symmetric variability: M~0.
+        - For dimming-dominated variability: M>>0.
+        - For brightening-dominated variability: M<<0.
+
+        Reference: Cody et al. (2014), AJ, 147, 82.
+        """
         # calculate M-index
         M_percentile = self._params.get('M_percentile', 10.)
         M_is_flux = self._params.get('M_is_flux', False)
@@ -193,71 +236,157 @@ class VariabilityIndex:
     @min_epochs_property
     def mad(self):
         """
-        median absolute deviation
+        Median absolute deviation of the magnitudes. See
+        `scipy.stats.median_abs_deviation`.
+
+        Expected behavior:
+        - For Gaussian noise: 1.4826*MAD ~ mean photometric uncertainty.
+        - For symmetric variability: MAD > mean photometric uncertainty.
+        - Insensitive to outliers (and thus to real asymmetric variability).
+
+        Reference: Sokolovsky et al. (2017), MNRAS, 464, 274, Sec. 2.3.
         """
         return ss.median_abs_deviation(self.lc.mag, nan_policy='omit')
 
     @min_epochs_property
     def chi_square(self):
         """
-        Raw Chi-square value
+        Raw chi-square value testing consistency with a constant
+        (non-variable) source, using `weighted_average` as the reference
+        magnitude.
+
+        Reference: Sokolovsky et al. (2017), MNRAS, 464, 274, Sec. 2.1.
         """
         return np.sum((self.lc.mag - self.weighted_average)**2 / self.lc.err**2)
 
     @min_epochs_property
     def reduced_chi_square(self):
         """
-        Reduced Chi-square value:
-        raw chi-square divided by the number of degrees of freedom (N-1)
+        Reduced chi-square value: `chi_square` divided by the number of
+        degrees of freedom (N-1).
+
+        Expected behavior:
+        - For Gaussian noise: ~1.
+        - For real variability: >1, growing with variability amplitude.
+
+        Reference: Sokolovsky et al. (2017), MNRAS, 464, 274, Sec. 2.1.
         """
         return self.chi_square/(np.count_nonzero(
                            ~np.isnan(self.lc.mag)) - 1)
-    
+
     @min_epochs_property
     def iqr(self):
         """
-        inter-quartile range
+        Inter-quartile range of the magnitudes (Q3-Q1). See
+        `scipy.stats.iqr`. Related to `std` and `mad`
+        (IQR ~ 0.761*MAD for a Gaussian).
+
+        Reference: Sokolovsky et al. (2017), MNRAS, 464, 274, Sec. 2.4.
         """
         return ss.iqr(self.lc.mag)
-    
+
     @min_epochs_property
     def roms(self):
         """
-        Robust-Median Statistics (RoMS)
+        Robust Median Statistics (RoMS): mean absolute deviation from the
+        median, normalised by each epoch's photometric uncertainty.
+
+        Expected behavior:
+        - For Gaussian noise: ~1.
+        - For real variables: >1.
+
+        Reference: Sokolovsky et al. (2017), MNRAS, 464, 274, Sec. 2.5.
         """
         return np.sum(np.abs(self.lc.mag - np.median(self.lc.mag))/self.lc.err)/(self.lc.n_epochs- 1)
 
 
     @min_epochs_property
     def normalised_excess_variance(self):
+        """
+        Normalised excess variance: the variance in excess of the mean
+        photometric noise, normalised by the mean magnitude.
+
+        Expected behavior:
+        - For Gaussian noise: ~0.
+        - For symmetric variability: >0.
+        - For asymmetric variability: >>0.
+
+        Reference: Sokolovsky et al. (2017), MNRAS, 464, 274, Sec. 2.6.
+        """
         return (self.std**2 - self.lc.mean_err**2)/self.lc.mean**2
 
     @min_epochs_property
     def lag1_auto_corr(self):
+        """
+        First-order (lag-1) autocorrelation coefficient of the magnitudes:
+        how correlated the light curve is with itself at a one-epoch lag.
+
+        Expected behavior:
+        - For Gaussian noise: consecutive points are uncorrelated, ~0.
+        - For slowly-varying (e.g. periodic) sources: >0.
+        - For monotonic long-term trends: approaches 1.
+        """
         if self.lc.n_epochs < self.min_epochs:
             return None
         else:
             return np.sum((self.lc.mag[:-1] - self.lc.mean) *
                       (self.lc.mag[1:] - self.lc.mean))/np.sum(
                           (self.lc.mag - self.lc.mean)**2)
-    
+
 
     @min_epochs_property
     def norm_ptp(self):
-        return (max(self.lc.mag - self.lc.err) - 
-            min(self.lc.mag + self.lc.err))/(max(self.lc.mag - self.lc.err) 
-                                        + min(self.lc.mag + self.lc.err))    
+        """
+        Normalised peak-to-peak amplitude, accounting for the photometric
+        uncertainty at the extreme epochs.
+
+        Reference: Sokolovsky et al. (2017), MNRAS, 464, 274, Sec. 2.7.
+        """
+        return (max(self.lc.mag - self.lc.err) -
+            min(self.lc.mag + self.lc.err))/(max(self.lc.mag - self.lc.err)
+                                        + min(self.lc.mag + self.lc.err))
 
     @min_epochs_property
     def anderson_darling(self):
+        """
+        Anderson-Darling statistic testing consistency of the magnitude
+        distribution with a Gaussian, weighting the tails of the
+        distribution more heavily than `shapiro_wilk`. See
+        `scipy.stats.anderson`.
+
+        Expected behavior:
+        - For Gaussian noise: A^2~0.
+        - For symmetric variability: A^2>0.
+        - For asymmetric variability: A^2>>0.
+        """
         return ss.anderson(self.lc.mag)[0]
 
     @min_epochs_property
     def skewness(self):
+        """
+        Skewness of the magnitude distribution. See `scipy.stats.skew`.
+
+        Expected behavior:
+        - For Gaussian noise: ~0.
+        - For symmetric variability: ~0.
+        - For asymmetric variability: sign follows the same dimming/
+          brightening convention as `asymmetry_index` (positive for
+          dimming-dominated, negative for brightening-dominated).
+        """
         return ss.skew(self.lc.mag, nan_policy='omit')
 
     @min_epochs_property
     def kurtosis(self):
+        """
+        Excess kurtosis of the magnitude distribution (Fisher's
+        definition, Gaussian = 0). See `scipy.stats.kurtosis`.
+
+        Expected behavior:
+        - For Gaussian noise: ~0.
+        - For broad, sinusoid-like variability: <0 (platykurtic).
+        - For variability dominated by rare sharp extrema (eclipses,
+          dips, bursts): >0 (leptokurtic).
+        """
         return ss.kurtosis(self.lc.mag)
 
     @min_epochs_property
@@ -337,24 +466,60 @@ class VariabilityIndex:
     
     @folded_property
     def qm_class(self):
+        """
+        Cody+2014 QM classification, from `asymmetry_index` (M) and
+        `periodicity_index` (Q). See `cody14_q_m_classifier` below.
+        """
         return cody14_q_m_classifier(self.asymmetry_index, self.periodicity_index)
-    
-    # @folded_property
-    # def lafler_kinman(self):
-    #     """
-    #     Lafler-Kinman string length index of the folded light-curve
-    #     """
-    #     return np.sum((self.lc.mag_phased[1:] - self.lc.mag_phased[:-1])**2) / np.sum(
-    #         (self.lc.mag_phased - self.lc.mean)**2)
-    
-    # @folded_property
-    # def string_length(self):
-    #     """
-    #     String length index of the folded light-curve
-    #     """
-    #     return np.sum(np.sqrt(np.diff(self.lc.mag_phased)**2 + np.diff(self.lc.phase)**2))
-    
-    
+
+    @folded_property
+    def saunders_norm(self):
+        """
+        Saunders statistic (Saunders et al. 2006, Astronomische
+        Nachrichten, 327, 783) diagnosing how clumpy the phase coverage
+        of the folded light-curve is, relative to equally-spaced phase
+        sampling. See `FoldedLightCurve.saunders_norm` for the definition.
+
+        Expected behavior:
+        - 0 for perfectly uniform phase coverage
+        - ~1 for random uniform phase coverage
+        - >1 for clumpy/poor phase coverage
+        """
+        return self.lc.saunders_norm
+
+    @folded_property
+    def lafler_kinman(self):
+        """
+        Lafler-Kinman string-length statistic (Lafler & Kinman 1965,
+        ApJS, 11, 216) of the folded light-curve. Since the folded light
+        curve is circular in phase, the sum includes the wraparound term
+        between the last and first phase-sorted points.
+
+        Expected behavior: minimised when the light curve is folded at
+        (or near) its true period, since consecutive phase-sorted points
+        then tend to have similar magnitudes; larger for a poor/aperiodic
+        fold, where consecutive phase-sorted points are effectively
+        uncorrelated in magnitude.
+        """
+        diffs = np.diff(self.lc.mag_phased, append=self.lc.mag_phased[0])
+        return np.sum(diffs**2) / np.sum((self.lc.mag_phased - self.lc.mean)**2)
+
+    @folded_property
+    def string_length(self):
+        """
+        String-length statistic (Dworetsky 1983, MNRAS, 203, 917) of the
+        folded light-curve: the total path length of the line connecting
+        phase-sorted (phase, magnitude) points, including the circular
+        wraparound term back to the first point.
+
+        Expected behavior: same sense as `lafler_kinman` - minimised for
+        a good fold at (or near) the true period, larger for a poor fold.
+        """
+        d_phase = np.diff(self.lc.phase, append=self.lc.phase[0] + 1.0)
+        d_mag = np.diff(self.lc.mag_phased, append=self.lc.mag_phased[0])
+        return np.sum(np.sqrt(d_mag**2 + d_phase**2))
+
+
     def _list_properties(self):
         """
         This tests if the LightCurve is Folded and return 
@@ -395,6 +560,16 @@ class VariabilityIndex:
         cls._suppress_warnings = False       
 
 class AsymmetryIndex:
+    """
+    Cody+2014 M-index: asymmetry of the light curve between its extreme
+    (top/bottom `percentile`) epochs and its median, normalised by the
+    standard deviation. Set `is_flux=True` when `mag` is actually in flux
+    units, to flip the sign convention so that M>0 still means
+    dimming-dominated variability. See `VariabilityIndex.asymmetry_index`
+    for the public entry point.
+
+    Reference: Cody et al. (2014), AJ, 147, 82.
+    """
     def __init__(self, parent, percentile=10., is_flux=False):
         self.parent = parent
         self._percentile = float(percentile)
@@ -426,13 +601,19 @@ class AsymmetryIndex:
         return (1. - 2*int(self.is_flux))*(np.mean(self.parent.lc.mag[self.get_percentile_mask]) - self.parent.lc.median)/self.parent.std
 
 class PeriodicityIndex:
+    """
+    Cody+2014 Q-index: ratio of the residual (waveform-subtracted) variance
+    to the raw phase-folded variance, both corrected for the mean
+    photometric noise. See `VariabilityIndex.periodicity_index` for the
+    public entry point.
+
+    Reference: Cody et al. (2014), AJ, 147, 82.
+    """
     def __init__(self, parent):
         self.parent = parent
 
     @property
     def value(self):
-        # print(self._waveform_type)
-        # self.parent.lc._get_waveform()
         return (np.std(self.parent.lc.residual, ddof=1)**2 - np.mean(self.parent.lc.err_phased)**2)\
             /(np.std(self.parent.lc.mag_phased, ddof=1)**2 - np.mean(self.parent.lc.err_phased)**2)
 
@@ -471,13 +652,15 @@ def gaia_AG_proxy(phot_g_mean_flux, phot_g_mean_flux_error, phot_g_n_obs):
     
     AG = sqrt(phot_g_n_obs)*phot_g_mean_flux_error/phot_g_mean_flux
 
-    For constant stars this is approximately the standard deviation of 
-    G light curves due to noise and uncalibrated systematic effects. 
-    _summary_
+    For constant stars this is approximately the standard deviation of
+    G light curves due to noise and uncalibrated systematic effects.
+
+    TODO: this has not yet been double-checked against Gaia's own
+    implementation/values.
 
     Args:
-        phot_g_mean_flux (_type_): _description_
-        phot_g_mean_flux_error (_type_): _description_
-        phot_g_n_obs (_type_): _description_
+        phot_g_mean_flux (float): Gaia `phot_g_mean_flux`.
+        phot_g_mean_flux_error (float): Gaia `phot_g_mean_flux_error`.
+        phot_g_n_obs (int): Gaia `phot_g_n_obs`.
     """
     return np.sqrt(phot_g_n_obs)*phot_g_mean_flux_error/phot_g_mean_flux
