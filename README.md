@@ -54,10 +54,10 @@ To instantiate a `LightCurve` object:
 
 ```python
   from variability.lightcurve import LightCurve
-  lc = LightCurve(time, mag, err)
+  lc = LightCurve(time=time, mag=mag_sin, err=err)
 ```
 
-Where the attributes `time`, `mag`, and `err` are numpy-arrays with the same length providing the observational time, magnitudes and magnitude uncertainties respectively. 
+Where the attributes `time`, `mag`, and `err` are numpy-arrays with the same length providing the observational time, magnitudes and magnitude uncertainties respectively. Note that `time`, `mag` and `err` are keyword-only arguments - `LightCurve(time, mag, err)` (positional) will raise a `TypeError`.
 
 Additionally to the time-series itself, `LightCurve` objects have a series of descriptive properties attached to itself. The list of properties currently implemented, can be accessed using:
 
@@ -187,18 +187,29 @@ Include a suite of widely used variability indexes. A great review on this subje
 To instantiate a `VariabilityIndex` object:
 
 ```python
+from variability.lightcurve import LightCurve, FoldedLightCurve
 from variability.indexes import VariabilityIndex
 
-var = VariabilityIndex(lc_p, timescale=period, min_epochs=5)
+lc = LightCurve(time=time, mag=mag_sin, err=err)
+var = VariabilityIndex(lc, min_epochs=5)
 ```
 
-you are expected to pass in a `LightCurve` object, or a `FoldedLightCurve` object. **Note that** some variability indexes, like the Q-index itself, require either a `timescale` argument or a `FoldedLightCurve` instance (which already have an instance `timescale`). `VariabilityIndex` requires a policy for minimum number of epochs in the light curve for properties derived from statistics with the light curve to be calculated, default to `min_epochs=5`. 
+you are expected to pass in a `LightCurve` object, or a `FoldedLightCurve` object - `VariabilityIndex` itself does **not** take a `timescale` argument; instead, phase-folded (timescale-dependent) indexes, like the Q-index, require passing in a `FoldedLightCurve` (which already carries its own `timescale`):
+
+```python
+lc_f = FoldedLightCurve(lc=lc, timescale=period)
+var_f = VariabilityIndex(lc_f, min_epochs=5)
+```
+
+`VariabilityIndex` requires a policy for minimum number of epochs in the light curve for properties derived from statistics with the light curve to be calculated, default to `min_epochs=5`. 
 
 The list of implemented variability indexes currently implemented can be accessed with:
 
 ``VariabilityIndex._list_properties()``
 
 This list depends if `VariabilityIndex` was created from a `LightCurve`, in which case all regular light-curve variability indexes implemented are listed; or if it was created from a `FoldedLightCurve(..., timescale)`, which phase-folded the light curve for the provided timescale. In this case, additionally to the regular indexes, with the addition of phase folded indexes. 
+
+Every property listed by `_list_properties()` can simply be read as an attribute, e.g. `var.std`, `var.mad`, `var.stetsonK`, or - for a `FoldedLightCurve`-backed `VariabilityIndex` - `var_f.periodicity_index`, `var_f.asymmetry_index`, `var_f.qm_class`.
 
 ### regular light-curve Variability indexes:
 
@@ -465,18 +476,17 @@ Expected behavior:
 
 **Reference:** [Stetson (1996), PASP, 108, 851](https://ui.adsabs.harvard.edu/abs/1996PASP..108..851S)
 
-<!--
-### Other variability indexes
+#### Abbe value (`VariabilityIndex.Abbe`)
 
-#### Abbe
+$$\mathcal{A} = \frac{N}{2(N-1)} \cdot \frac{\sum_{i=1}^{N-1}(m_{i+1}-m_i)^2}{\sum_{i=1}^{N}(m_i-\bar{m})^2}$$
 
-~~Calculate Abbe value as in Mowlavi 2014A%26A...568A..78M
-https://www.aanda.org/articles/aa/full_html/2014/08/aa22648-13/aa22648-13.html~~
+Also known as the von Neumann ratio: a test for serial correlation between consecutive epochs, closely related to `lag1_auto_corr` above ($\mathcal{A}\approx1-l_1$ for large $N$).
 
-**Reference:** [Sokolovsky et al. (2017), also Sec. 2.16](https://academic.oup.com/mnras/article-lookup/doi/10.1093/mnras/stw2262)
+Expected behavior:
+- For Gaussian noise (no serial correlation): $\mathcal{A}\approx1$.
+- For slowly-varying (e.g. periodic, smoothly trending) sources, where consecutive epochs are similar: $\mathcal{A}<1$.
 
-Also nami
--->
+**Reference:** [Mowlavi (2014), A&A, 568, A78](https://www.aanda.org/articles/aa/full_html/2014/08/aa22648-13/aa22648-13.html); see also [Sokolovsky et al. (2017), Sec. 2.16](https://academic.oup.com/mnras/article-lookup/doi/10.1093/mnras/stw2262).
 
 ### Phase-folded variability indexes
 
@@ -508,6 +518,25 @@ Expected behavior:
 
 **Note**
 
+#### QM classification (`VariabilityIndex.qm_class`)
+
+Combines the M-index (`asymmetry_index`) and Q-index (`periodicity_index`) into the light-curve morphological class from Cody+2014, via the module-level function `cody14_q_m_classifier(M_index, Q_index)`:
+
+| M-index | Q-index | Class | Meaning |
+|---|---|---|---|
+| $M>0.25$ | $0\leq Q<0.11$ | `EB` | Eclipsing binary |
+| $M\leq0.25$ | $0\leq Q<0.11$ | `P` | Periodic |
+| $\lvert M\rvert\leq0.25$ | $0.11\leq Q\leq0.61$ | `QPS` | Quasi-periodic symmetric |
+| $M>0.25$ | $0.11\leq Q\leq0.61$ | `QPD` | Quasi-periodic dipper |
+| $M>0.25$ | $0.61<Q\leq1$ | `APD` | Aperiodic dipper |
+| $M<-0.25$ | $Q>0.11$ | `B` | Burster |
+| $\lvert M\rvert\leq0.25$ | $0.61<Q\leq1$ | `S` | Stochastic |
+| *(anything else)* | | `Unclassified` | e.g. $M<-0.25$ with $Q\leq0.11$, which falls outside every rule above |
+
+Returns `None` if either index is `None` (e.g. because `min_epochs` wasn't met, or the light curve isn't folded).
+
+**Reference:** [Cody+2014](https://iopscience.iop.org/article/10.1088/0004-6256/147/4/82)
+
 #### Means of residuals (`VariabilityIndex.residual_mean`, `VariabilityIndex.residual_std`)
 
 Mean and (bias-corrected) standard deviation of the residual curve ($r_{\phi_i}=m_{\phi_i}-\hat{m}_{\phi_i}$, see the `FoldedLightCurve.residual` attribute above) - i.e. the same $\sigma_\mathrm{r}$ that enters the Q-index numerator, exposed on its own as it can be a useful feature independently of $Q$.
@@ -528,12 +557,11 @@ where the sums run over the phase-sorted, folded light curve, wrapping around so
 
 <details>
 - :heavy_check_mark: Fix Stetson-index implementation
-- :white_large_square: Complete Variability-index documentation
-  - :white_large_square: Complete description
-  - :white_large_square: add examples
-  - :white_large_square: add references
-- interpercentile range
--  
+- :heavy_check_mark: Complete Variability-index documentation
+  - :heavy_check_mark: Complete description
+  - :heavy_check_mark: add examples
+  - :heavy_check_mark: add references
+- :white_large_square: interpercentile range
 </details>
 
 

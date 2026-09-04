@@ -15,7 +15,7 @@ __This currently includes__
 - kurtosis
 - normalised_excess_variance
 - lag1_auto_corr
-- von_neumann (abbe)
+- Abbe (von Neumann ratio)
 - norm_ptp
 - mad
 - periodicity_index
@@ -206,17 +206,21 @@ class VariabilityIndex:
         M_is_flux = self._params.get('M_is_flux', False)
         return AsymmetryIndex(parent=self,percentile=M_percentile, is_flux=M_is_flux).value
 
-    # @property    
+    @min_epochs_property
     def Abbe(self):
         """
-        Calculate Abbe value as in Mowlavi 2014A%26A...568A..78M
-        https://www.aanda.org/articles/aa/full_html/2014/08/aa22648-13/aa22648-13.html
+        Abbe value / von Neumann ratio (Mowlavi 2014, A&A, 568, A78), a
+        test for serial correlation between consecutive epochs, closely
+        related to `lag1_auto_corr` (Abbe ~= 1 - lag1_auto_corr for
+        large N).
+
+        Expected behavior:
+        - For Gaussian noise (no serial correlation): Abbe ~ 1.
+        - For slowly-varying (e.g. periodic, smoothly trending) sources,
+          where consecutive epochs are similar: Abbe < 1.
         """
-        if self.lc.n_epochs > self.min_epochs:
-            return self.lc.n_epochs* np.sum((self.lc.mag[1:] - self.lc.mag[:-1])**2) /\
-                2 / np.sum((self.lc.mag - self.lc.mean)**2) / (self.lc.n_epochs- 1)
-        else:
-            return None
+        return self.lc.n_epochs* np.sum((self.lc.mag[1:] - self.lc.mag[:-1])**2) /\
+            2 / np.sum((self.lc.mag - self.lc.mean)**2) / (self.lc.n_epochs- 1)
 
     @min_epochs_property
     def stetsonK(self):
