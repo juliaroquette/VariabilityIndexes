@@ -26,11 +26,11 @@ Provides tools for loading light curves as objects. Three distinct classes relat
 - `SyntheticLightCurve` (under construction) provide a suite of models of light curves for different variability modes and survey fingerprints. 
 - `MultiBandLighCurve`  (not implemented yet) deals with (quasi-)simultaneous multiband light curves.
 
-Throughout this documentation, we approach an observed light-curve as a series of observations, $\{m_i\}$, where:
+Throughout this documentation, we approach an observed light-curve as a series of observations, $\lbrace m_i\rbrace $, where:
 
 $$m_i = m(t_i) + a(t_i) + \epsilon_{i},$$
 
-where $m_i$ is the $i$-th observation at the time $t_i$, $\{m(t_i)\}$ are a series of snapshots of a time-dependent signal at the time $t_i$ (or the primary signal in the light-curve).  $\{a(t_i)\}$ is any secondary signal, which is often assume to be zero. $\epsilon_{i}$ is the photometric uncertainty for the $i$-th observation, which in an ideal case is not too far from the survey's typical uncertainty, $\bar{\epsilon}$.
+where $m_i$ is the $i$-th observation at the time $t_i$, $\lbrace m(t_i)\rbrace $ are a series of snapshots of a time-dependent signal at the time $t_i$ (or the primary signal in the light-curve).  $\lbrace a(t_i)\rbrace $ is any secondary signal, which is often assume to be zero. $\epsilon_{i}$ is the photometric uncertainty for the $i$-th observation, which in an ideal case is not too far from the survey's typical uncertainty, $\bar{\epsilon}$.
 
 For example, let's consider the following light-curve:
 
@@ -48,7 +48,7 @@ mag_sin = 0.5 * amplitude * np.sin(2 * np.pi * time / period) + noise
 
 ## `LightCurve` class
 
- `LightCurve` is a class that formats input time-series data, $\{t_i, m_i, \epsilon_i\}$, into a standard representation. 
+ `LightCurve` is a class that formats input time-series data, $\lbrace t_i, m_i, \epsilon_i\rbrace $, into a standard representation. 
 
 To instantiate a `LightCurve` object:
 
@@ -105,7 +105,7 @@ Uses [`np.median`](https://numpy.org/doc/stable/reference/generated/numpy.nanmed
 
 ## `FoldedLightCurve` class
 
-Given that a real variable process, $\{m(t_i)\}$, is present in the observed light curve, we can assume that this process has an underlying characteristic timescale, $\tau$. Whether $\tau$ is a _periodic_ or an _aperiodic_ is the subject of the `TimeSeries` class. Here, whatever is the nature of $\tau$, we assume it can be used to transform the light-curve into a phase-folded representation,  $m_{\phi_i}=\{m(\phi_i)\}$, with $0\leq\phi_i\leq1$. In practice, the transformation $t_i\rightarrow \phi_i$ maps each time observation, $t_i$, into which _phase_ of the of a variability cycle that observation is. In this context, c is:
+Given that a real variable process, $\lbrace m(t_i)\rbrace $, is present in the observed light curve, we can assume that this process has an underlying characteristic timescale, $\tau$. Whether $\tau$ is a _periodic_ or an _aperiodic_ is the subject of the `TimeSeries` class. Here, whatever is the nature of $\tau$, we assume it can be used to transform the light-curve into a phase-folded representation,  $m_{\phi_i}=\lbrace m(\phi_i)\rbrace $, with $0\leq\phi_i\leq1$. In practice, the transformation $t_i\rightarrow \phi_i$ maps each time observation, $t_i$, into which _phase_ of the of a variability cycle that observation is. In this context, c is:
  
 
 $$
@@ -134,10 +134,10 @@ Note that creating `FoldedLightCurve` objects from `LightCurve` objects will res
 
  Additionally to the same attributes as a `LightCurve` object, `FoldedLightCurve` has the following additional attributes:
 
-- `phase`: ($\{\phi_i\}$) phase values of the folded light curve ($0\leq\phi_i\leq1$).
-- `phase_number`: ($\{\tilde{\phi_i}\}$) phase number is the integer part of the phase calculation. 
-- `mag_pahsed`: ($m_{\phi_i}=\{m(\phi_i)\}$) magnitude values of the folded light curve, sorted based on ascending phase.
-- `err_pahsed`: ($\epsilon_{\phi_i}=\{\epsilon(\phi_i)\}$) The error values of the folded light curve, sorted based on phase.
+- `phase`: ($\lbrace \phi_i\rbrace $) phase values of the folded light curve ($0\leq\phi_i\leq1$).
+- `phase_number`: ($\lbrace \tilde{\phi_i}\rbrace $) phase number is the integer part of the phase calculation. 
+- `mag_pahsed`: ($m_{\phi_i}=\lbrace m(\phi_i)\rbrace $) magnitude values of the folded light curve, sorted based on ascending phase.
+- `err_pahsed`: ($\epsilon_{\phi_i}=\lbrace \epsilon(\phi_i)\rbrace $) The error values of the folded light curve, sorted based on phase.
 - `waveform`: ($\hat{m}_{\phi_i}$) waveform for phase-folded light curve estimated by smoothing the light curve using uneven_savgol (default) or other method if specified. 
 
 
@@ -169,10 +169,10 @@ $
 Then the metrics defined as:
 $$
 S_{\mathrm{norm}} \;=\; 
-\frac{N+1}{\,N-1\,} \left( N \sum_{i=1}^{N} \left( \Delta \phi_i \right)^{2} - 1 \right).
+\frac{N+1}{N-1} \left( N \sum_{i=1}^{N} \left( \Delta \phi_i \right)^{2} - 1 \right).
 $$
 
-Where $S_{\mathrm{norm}} = 0$ for perfectly uniform phase coverage, $S_{\mathrm{norm}} \approx 1$ for random uniform phases, and $S_{\mathrm{norm}} => 1$ for clumpy or poor phase coverage.
+Where $S_{\mathrm{norm}} = 0$ for perfectly uniform phase coverage, $S_{\mathrm{norm}} \approx 1$ for random uniform phases, and $S_{\mathrm{norm}} > 1$ for clumpy or poor phase coverage.
 
 
 
@@ -232,7 +232,7 @@ $$
 \sigma = \sqrt{\frac{1}{N-1} \sum_{i=1}^{N} (m_i - \bar{m})^2}
 $$
 
-For non-variable sources, $\sigma\approx\bar{\epsilon}$, given that uncertainties $\{\epsilon_i\}$ are realistic.
+For non-variable sources, $\sigma\approx\bar{\epsilon}$, given that uncertainties $\lbrace \epsilon_i\rbrace $ are realistic.
 
 #### signal-to-noise ratio `SNR` 
 
@@ -423,7 +423,7 @@ Expected behavior: measure of variability amplitude
 
 Robust peak-to-peak amplitude estimator defined as the difference between the median values of the tails of the magnitude distribution. Tails are defined as the $p\%$ outermost sources at each side of the distribution.
 
-$$\Delta m_{p}=\text{median}\{m_i:m_i\leq P_{100-p}\}-\text{median}\{m_i:m_i\leq P_{p}\},$$
+$$\Delta m_{p}=\text{median}\lbrace m_i:m_i\leq P_{100-p}\rbrace -\text{median}\lbrace m_i:m_i\leq P_{p}\rbrace ,$$
 
 Where $P_p$ is the p-th percentile of the distribution of magnitudes. 
 
@@ -449,9 +449,9 @@ Expected behavior:
 
 #### M-index (`VariabilityIndex.asymmetry_index`)
 
-$$M = \frac{<m_{10\%}>-\text{median\{m\}}}{\sigma_m}$$
+$$M = \frac{\langle m_{10\%}\rangle-\text{median}\lbrace m\rbrace}{\sigma_m}$$
 
-$<m_{10\%}>$ is all the data in the top and bottom decile of the light-curve. 
+$\langle m_{10\%}\rangle$ is all the data in the top and bottom decile of the light-curve. 
 Not that there are conflicting definitions in the literature, where $\sigma_m$ is sometimes the overall rms of the light-curve and sometimes its standard-deviation! Here I am using the second one. 
 
 
@@ -697,7 +697,7 @@ The **Structure Functions (SF)** are used to examine the timescales of variabili
 
 There are a few different definitions of SF out there, but here we work with definition as in [Hughes92](https://ui.adsabs.harvard.edu/abs/1992ApJ...396..469H) where:  
 
-$$SF(\tau) = \frac{1}{N} \sum_{i,j} (m_i - m_j)^2, \,\, i>j$$
+$$SF(\tau) = \frac{1}{N} \sum_{i,j} (m_i - m_j)^2, \quad i>j$$
 
 where $N$ is the number of pairs separated by a time lag $\tau$, and $m_i - m_j$ is the magnitude difference for each pair.
 
@@ -728,7 +728,7 @@ Before fitting the SF model to the SF data. There may be a few complications beh
 
 #### unbinned
 
-The first step for sampling is to estimate the ${SF(\tau),\tau}$. This step is done by `structure_function.get_sf_time_lags(time, mag, err)`, and includes as a default the propagation of magnitude uncertainties into SF uncertainties.  
+The first step for sampling is to estimate the $\lbrace SF(\tau),\tau\rbrace$. This step is done by `structure_function.get_sf_time_lags(time, mag, err)`, and includes as a default the propagation of magnitude uncertainties into SF uncertainties.  
 
 *Why not simply fit the SF model to unbinned data?* Depending on the duration and cadence of the light-curve, the SF has many have many more points at longer time-lags. Consequently, when fitting the the SF model directly to the unbinned data, $SF(\tau)$ for large $\tau$ will have much more weight in the fit.
 
@@ -754,7 +754,7 @@ This calculation is done within the auxiliary function `bin_edges_and_centers(ti
 
 For example, relatively well sampled SF around timescale related to rotational modulation in young stars, we may want to have timebins 0.5 days appart at a $\tau=10$ d
 
-$$\log_{10}{(10 + 0.5)} - \log_{10}{(10)} \approx 0.02\,\text{dex}$$
+$$\log_{10}{(10 + 0.5)} - \log_{10}{(10)} \approx 0.02\ \text{dex}$$
 
  which results on $N_{bins}=240$
 
@@ -854,7 +854,7 @@ $$
 
 ##### Reduced $\chi^2$
 
-For reduced-\Chi^2:
+For reduced-$\chi^2$:
 
 $$\chi_{red}^2 = \frac{\chi^2}{N-k}$$
 
