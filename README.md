@@ -93,14 +93,15 @@ Uses [`np.median`](https://numpy.org/doc/stable/reference/generated/numpy.nanmed
 - `time_max`: Maximum value of the observation times ($t_{max}$).
 - `time_min`: Minimum value of the observation times ($t_{min}$).
 - `time_span`: Total time-span of the light curve, $t_{max}-t_{min}$ 
+- `dt_median`: Median of the time differences between consecutive epochs, $\text{median}(\Delta t)$.
+- `dt_min`: Minimum time difference between consecutive epochs.
+- `dt_max`: Maximum time difference between consecutive epochs.
+- `dt_10th`: 10th percentile of the time differences between consecutive epochs.
+- `dt_90th`: 90th percentile of the time differences between consecutive epochs.
+- `dt_geomean`: Geometric mean of the time differences between consecutive epochs. Useful as a robust cadence estimator when $\Delta t$ spans several orders of magnitude (e.g. mixed same-night and multi-night sampling).
 <!--
 - `range`: another flavor of ptp amplitude bin in terms of maximum/minimum values of magnitude: $$x_{max}-x_{min}$$ 
 -->
-
-
-TODO:
-
-- add further time info which can help the GLS definition. typical delta t, minimum/maximum delta t
 
 ## `FoldedLightCurve` class
 
@@ -375,11 +376,11 @@ Expected behavior:
 $$\text{Skewness} = \frac{\frac{1}{n} \sum_{i=1}^{n} (m_i - \bar{m})^3}{\left(\frac{1}{n} \sum_{i=1}^{n} (m_i - \bar{m})^2\right)^{\frac{3}{2}}}$$
 
 Expected behavior:
-- For Gaussian noise: 
-- For symmetric variability: 
-- For asymmetric variability:
+- For Gaussian noise: Skewness $\approx0$.
+- For symmetric variability: Skewness $\approx0$ (amplitude changes, but the distribution stays symmetric).
+- For asymmetric variability: Skewness $\neq0$; the sign follows the same convention as the M-index above — dimming-dominated variability (e.g. dippers) has a tail towards fainter magnitudes and Skewness $>0$, while brightening-dominated variability (e.g. bursters) has Skewness $<0$.
 
-**Note**
+**Note:** Computed with [`scipy.stats.skew`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.skew.html). Like the M-index, this is sensitive to which direction (dimming/brightening) dominates the light curve, but unlike M-index it uses all epochs rather than just the outer decile, making it more sensitive to the bulk of the distribution and less to its extremes.
 
 
 ####  kurtosis (`VariabilityIndex.kurtosis`)
@@ -387,11 +388,11 @@ $$\text{Kurtosis} = \frac{\frac{1}{n} \sum_{i=1}^{n} (m_i - \bar{m})^4}{\left(\f
 
 
 Expected behavior:
-- For Gaussian noise: 
-- For symmetric variability: 
-- For asymmetric variability:
+- For Gaussian noise: excess Kurtosis $\approx0$ (mesokurtic, i.e. as peaked/tailed as a normal distribution).
+- For symmetric variability with a broad, sinusoid-like magnitude distribution: excess Kurtosis $<0$ (platykurtic; the light curve spends relatively more time away from the mean than a Gaussian would).
+- For variability dominated by rare, sharp extrema (e.g. eclipses, dips, bursts): excess Kurtosis $>0$ (leptokurtic; sharp central peak plus heavy tails from the rare deep events).
 
-**Note**
+**Note:** Computed with [`scipy.stats.kurtosis`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.kurtosis.html), which returns the *excess* kurtosis (Fisher's definition, normal distribution $=0$) rather than the raw kurtosis in the formula above (normal distribution $=3$).
 
 
 #### Normalized peak-to-peak variability `VariabilityIndex.norm_ptp`
@@ -424,6 +425,8 @@ Here there are 3 flavours implemented:
 Expected behavior: measure of variability amplitude while robust against outliers. The smaller the percentile, the more sensitive it will be against extreme asymmetric variability. The higher p may work better for describing the typical variability amplitude. 
 
 #### weighted standard deviation
+
+**Not implemented yet.** `VariabilityIndex.weighted_average` exists (weighted mean, see above), but there is no corresponding weighted *standard deviation* in `indexes.py`. This entry documents an index that still needs to be added.
 
 **Reference:** [Sokolovsky et al. (2017), Sec. 2.2](https://academic.oup.com/mnras/article-lookup/doi/10.1093/mnras/stw2262)
 
@@ -600,16 +603,31 @@ residuals = wf.residual_magnitude(waveform)
 # Variability timescale 
 
 
-## `timescale` module:
+## `timescales` module:
 
 ```python
-from variability.timescale import  TimeScale
+from variability.timescales import TimeScale
 ```
 
-The `TimeScale` class allows to quick estimation of variability light curves for an object `LightCurve` defined from a trio (`time, mag, err`). There are two types of timescale estimator currently implemented:
+The `TimeScale` class derives a characteristic variability timescale, plus a suite of temporal/frequency-domain features, for a `LightCurve` object.
 
-- Periodic Timescale:
-- Aperiodic timescale: 
+```python
+ts = TimeScale(lc, method='auto')
+```
+
+`method` controls which timescale estimator is used:
+- `'LSP'`: period of the highest peak of a Generalized Lomb-Scargle periodogram ([`astropy.timeseries.LombScargle`](https://docs.astropy.org/en/stable/timeseries/lombscargle.html)), appropriate for (quasi-)periodic light curves.
+- `'SF'`: aperiodic timescale from fitting the turnover of the structure function (see `structure_function` module below).
+- `'auto'` (default): tries `'LSP'` first; if the highest peak's False Alarm Probability (`fap_prob`, default `0.01`) is not significant, falls back to `'SF'`.
+
+The resulting timescale and its provenance are available as `ts.ts`, `ts.ts_err` and `ts.method` (`'LSP'`, `'SF'` or `None`), with the individual per-method values always kept in `ts.LSP_ts`/`ts.SF_ts`/`ts.SF_ts_err`.
+
+Whenever the LSP periodogram is computed (`method='LSP'` or `'auto'`), `TimeScale` also derives, by default:
+- `ts.peak_periods`, `ts.peak_powers`, `ts.peak_faps`: the top `n_peaks` (default 10) distinct periodogram peaks, found with a minimum frequency separation so a single spectral lobe doesn't dominate the list; NaN-padded if fewer are found. `ts.n_significant_peaks` counts how many pass the `fap_prob` threshold.
+- `ts.spectral_entropy`, `ts.power_concentration`: shape summaries of the whole periodogram (how concentrated the power is in a single frequency vs. spread out).
+- `ts.peak_Q`, `ts.best_Q_period`, `ts.best_Q`: the Cody+14 Q-index (see `VariabilityIndex.periodicity_index` above) evaluated by phase-folding the light curve at each of the top `q_top_k` (default 3) candidate periods. A genuine period folds cleanly (`Q` close to 0); an alias or sampling artifact usually doesn't — this is a much stronger period-validity check than periodogram power alone, and `best_Q_period` can be a better "true period" pick than the highest-power peak.
+
+Independently of `method`, `TimeScale` also derives an autocorrelation-function (ACF) timescale by default (disable with `compute_acf=False`): `ts.ACF_ts` is the lag at which an ACF curve derived from the structure function ($\mathrm{ACF}(\tau) = 1 - SF(\tau)/2\sigma^2$, valid for a stationary process) first crosses $1/e$, with the full curve kept in `ts.ACF_lags`/`ts.ACF_values`. This reuses the structure-function binning (see below) and does not require `iminuit`.
 
 ## Structure functions
 
@@ -817,13 +835,11 @@ $$
 
 ## TO DO list
 - :heavy_check_mark: **@juliaroquette** Polish Lomb Scargle 
-- :white_large_square: **@juliaroquette** Add Structure function 
+- :heavy_check_mark: **@juliaroquette** Add Structure function 
 - :white_large_square: Include alternative fitting to iminuit?
 <!-- - :white_large_square: **@juliaroquette**  -->
 <!-- - :white_large_square: **@juliaroquette**  -->
 
-
-**@juliaroquette** Still under implementation, will include our codes for estimating timescales. 
 
 
 ## `SyntheticLightCurve`
@@ -831,14 +847,16 @@ $$
 **@juliaroquette** Still under implementation, will allow to generate synthetic light-curves for given observational windows. 
 
 ```python 
-from variability.lightcurve import FoldedLightCurve
+from variability.synthetic import SyntheticLightCurve
 ```
+
+**Note (2026-09-04):** `variability/synthetic.py` currently contains three classes with overlapping method names — `SyntheticLightCurve_25`, `SyntheticLightCurve` and `SyntheticLightCurve_` — likely successive drafts. The waveform checklist below has not been re-audited against all three, so a checked/unchecked item may not hold for every one of them; this should be resolved (probably by consolidating into a single class) before trusting the checklist below at the method level.
 
 ## TO DO list
 
-:white_large_square: **@juliaroquette** It may be worth it consider the possibility of merging `LightCurve` and `FoldedLightCurve` into a single class. <- Consider that after the `timescale.py` package has been implemented. 
+:white_large_square: **@juliaroquette** It may be worth it consider the possibility of merging `LightCurve` and `FoldedLightCurve` into a single class. The precondition for this ("after the `timescale.py` package has been implemented") is now met — `timescales.py`'s `TimeScale` class is implemented (LSP + structure-function timescales, periodogram peak/shape features, ACF timescale) — so this is now unblocked, pending an actual decision on whether to merge.
 
-:white_large_square: read observational windows from file
+:heavy_check_mark: read observational windows from file (`SyntheticLightCurve_.read_observational_window`)
 
 :white_large_square: Implement a list of observational windows
   - :white_large_square: TESS
@@ -852,10 +870,10 @@ from variability.lightcurve import FoldedLightCurve
   - :white_large_square: input
 
 :white_large_square: Include waveforms 
-  - :heavy_check_mark: PS
-  - :white_large_square: QPS
-  - :white_large_square: EB
-  - :white_large_square: AATAU
+  - :heavy_check_mark: PS (periodic symmetric)
+  - :heavy_check_mark: QPS (quasiperiodic symmetric)
+  - :heavy_check_mark: EB (eclipsing binary)
+  - :heavy_check_mark: AATAU
   - :white_large_square: QPD
   - :white_large_square: QPB
   - :white_large_square: B
